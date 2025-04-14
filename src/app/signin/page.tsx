@@ -90,7 +90,9 @@ export default function SignInPage() {
           <h2 className="text-2xl font-bold mb-2">회원가입</h2>
           <div className="flex justify-end">
             <button
-              onClick={handleRegister}
+              onClick={() => {
+                setIsModalOpen(true);
+              }}
               className="mt-4 bg-green-500 text-white p-2 rounded hover:bg-green-600"
             >
               회원가입

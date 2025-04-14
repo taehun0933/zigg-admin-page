@@ -21,7 +21,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({ items }) => {
   return (
     <nav className="flex justify-between items-center bg-gray-100 p-4 border-b border-gray-300">
       <button
-        className="text-xl font-bold"
+        className="text-xl font-bold cursor-pointer"
         onClick={() => {
           router.push("/");
         }}

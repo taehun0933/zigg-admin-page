@@ -171,7 +171,65 @@ const AuditionPage: React.FC = () => {
         title="오디션 생성"
         sizeMode="LARGE"
       >
-        <p>gd</p>
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* 왼쪽: Upload Photo */}
+          <div className="flex-1 flex items-center justify-center bg-gray-100 min-h-[300px]">
+            <span className="text-2xl font-bold">Upload Photo</span>
+          </div>
+
+          {/* 오른쪽: Form 입력 */}
+          <div className="flex-1 space-y-4">
+            <div>
+              <label className="block font-semibold mb-1">Audition Name</label>
+              <input
+                type="text"
+                placeholder="Enter audition name"
+                className="w-full border border-gray-300 rounded p-2"
+              />
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="block font-semibold mb-1">Start Date</label>
+                <input
+                  type="date"
+                  className="w-full border border-gray-300 rounded p-2"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block font-semibold mb-1">End Date</label>
+                <input
+                  type="date"
+                  className="w-full border border-gray-300 rounded p-2"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-semibold mb-1">지원자격</label>
+              <input
+                type="text"
+                placeholder="Add a brief introduction"
+                className="w-full border border-gray-300 rounded p-2"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold mb-1">간단한 설명</label>
+              <input
+                type="text"
+                placeholder="Add a brief introduction"
+                className="w-full border border-gray-300 rounded p-2"
+              />
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button className="bg-black text-white px-6 py-2 rounded">
+                생성하기
+              </button>
+            </div>
+          </div>
+        </div>
       </Modal>
       <button
         className="fixed bottom-12 right-12 bg-black text-white px-6 py-3 rounded-lg transition-all hover:scale-105 cursor-pointer"

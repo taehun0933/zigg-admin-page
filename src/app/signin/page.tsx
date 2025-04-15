@@ -33,7 +33,7 @@ export default function SignInPage() {
       router.push("/dashboard");
     } catch (error) {
       // const apiError = error as ApiErrorType;
-      alert("아이디 또는 비밀번호를 확인해 주세요!");
+      alert("아이디 또는 비밀번호가 잘못되었습니다!");
     }
   };
 
@@ -50,13 +50,9 @@ export default function SignInPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="모달 제목"
-      >
+      {/* <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <p>이곳에 모달 내용이 들어갑니다.</p>
-      </Modal>
+      </Modal> */}
       <NavigationBar items={[]} />
 
       <header className="bg-gray-700 text-white text-center py-16 px-4">

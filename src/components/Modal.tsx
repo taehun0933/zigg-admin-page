@@ -1,24 +1,49 @@
-import React from "react";
+import React, { useEffect } from "react";
 
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
+  sizeMode: "SMALL" | "MIDDLE" | "LARGE";
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+const Modal: React.FC<ModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  sizeMode,
+}) => {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "auto";
+    }
+
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const widthClass = {
+    SMALL: "md:w-1/3",
+    MIDDLE: "md:w-1/2",
+    LARGE: "md:w-2/3",
+  }[sizeMode];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-lg w-11/12 md:w-1/2 lg:w-1/3">
+      <div className={`bg-white rounded-lg shadow-lg w-11/12 ${widthClass}`}>
         {/* 모달 헤더 */}
         <div className="flex justify-between items-center border-b border-gray-300 p-4">
           {title && <h2 className="text-xl font-bold">{title}</h2>}
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 cursor-pointer"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -38,7 +63,14 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
         </div>
 
         {/* 모달 내용 */}
-        <div className="p-4">{children}</div>
+        <div
+          className="p-4 overflow-y-scroll max-h-[600px]"
+          style={{
+            scrollbarWidth: "none",
+          }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

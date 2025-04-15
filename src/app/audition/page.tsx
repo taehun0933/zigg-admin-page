@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Navigation, { NavItem } from "@/components/NavigationBar";
 import AuditionCard from "@/components/AuditionCard";
 import { useAuth } from "@/contexts/AuthContext";
+import Modal from "@/components/Modal";
 
 interface Audition {
   id: number;
@@ -112,6 +113,7 @@ const AuditionPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [ongoingAuditions, setOngoingAuditions] = useState<Audition[]>([]);
   const [completedAuditions, setCompletedAuditions] = useState<Audition[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -163,7 +165,20 @@ const AuditionPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
-      <button className="fixed bottom-12 right-12 bg-black text-white px-4 py-2 rounded-lg transition-all hover:scale-105 cursor-pointer">
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="오디션 생성"
+        sizeMode="LARGE"
+      >
+        <p>gd</p>
+      </Modal>
+      <button
+        className="fixed bottom-12 right-12 bg-black text-white px-6 py-3 rounded-lg transition-all hover:scale-105 cursor-pointer"
+        onClick={() => {
+          setIsModalOpen(true);
+        }}
+      >
         오디션 생성
       </button>
       <Navigation items={navItems} />

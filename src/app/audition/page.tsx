@@ -46,11 +46,6 @@ const AuditionPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <Navigation items={navItems} />
-      <Header
-        title="오디션 관리"
-        subTitle="오디션 정보를 관리하는 페이지입니다."
-      />
-
       <main className="max-w-6xl mx-auto p-4 pt-12">
         {/* 섹션: 다가오는 오디션 */}
         <section className="mb-8">

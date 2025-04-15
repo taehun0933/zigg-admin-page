@@ -32,8 +32,8 @@ export default function SignInPage() {
       setIsLoggedIn(true);
       router.push("/dashboard");
     } catch (error) {
-      const apiError = error as ApiErrorType;
-      alert(apiError.message);
+      // const apiError = error as ApiErrorType;
+      alert("아이디 또는 비밀번호를 확인해 주세요!");
     }
   };
 

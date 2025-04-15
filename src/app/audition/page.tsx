@@ -3,13 +3,115 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navigation, { NavItem } from "@/components/NavigationBar";
-import Header from "@/components/Header";
+import AuditionCard from "@/components/AuditionCard";
 import { useAuth } from "@/contexts/AuthContext";
+
+interface Audition {
+  id: number;
+  title: string;
+  startDate: string;
+  endDate: string;
+  totalApplicants: number;
+  selectedApplicants: number;
+}
+
+const allAuditions: Audition[] = [
+  {
+    id: 1,
+    title: "2025 봄 시즌 오디션",
+    startDate: "2025-04-01",
+    endDate: "2025-04-30",
+    totalApplicants: 0,
+    selectedApplicants: 0,
+  },
+  {
+    id: 2,
+    title: "여름 히트곡 프로젝트",
+    startDate: "2025-05-01",
+    endDate: "2025-05-20",
+    totalApplicants: 0,
+    selectedApplicants: 0,
+  },
+  {
+    id: 3,
+    title: "글로벌 K-POP 오디션",
+    startDate: "2025-06-01",
+    endDate: "2025-06-10",
+    totalApplicants: 0,
+    selectedApplicants: 0,
+  },
+  {
+    id: 4,
+    title: "댄스 크루 오디션",
+    startDate: "2025-07-01",
+    endDate: "2025-07-15",
+    totalApplicants: 0,
+    selectedApplicants: 0,
+  },
+  {
+    id: 5,
+    title: "2025 겨울 시즌 오디션",
+    startDate: "2025-01-01",
+    endDate: "2025-01-10",
+    totalApplicants: 50,
+    selectedApplicants: 10,
+  },
+  {
+    id: 6,
+    title: "가을 콜라보레이션",
+    startDate: "2024-10-01",
+    endDate: "2024-10-05",
+    totalApplicants: 30,
+    selectedApplicants: 5,
+  },
+  {
+    id: 7,
+    title: "여름 아이돌 오디션",
+    startDate: "2024-07-01",
+    endDate: "2024-07-20",
+    totalApplicants: 200,
+    selectedApplicants: 5,
+  },
+  {
+    id: 8,
+    title: "봄 솔로 아티스트",
+    startDate: "2024-04-01",
+    endDate: "2024-04-15",
+    totalApplicants: 100,
+    selectedApplicants: 15,
+  },
+  {
+    id: 9,
+    title: "겨울 래퍼 오디션",
+    startDate: "2024-01-01",
+    endDate: "2024-01-10",
+    totalApplicants: 80,
+    selectedApplicants: 8,
+  },
+  {
+    id: 10,
+    title: "가을 밴드 오디션",
+    startDate: "2023-09-01",
+    endDate: "2023-09-10",
+    totalApplicants: 40,
+    selectedApplicants: 5,
+  },
+  {
+    id: 11,
+    title: "여름 댄스 크루",
+    startDate: "2023-06-01",
+    endDate: "2023-06-20",
+    totalApplicants: 60,
+    selectedApplicants: 3,
+  },
+];
 
 const AuditionPage: React.FC = () => {
   const router = useRouter();
   const { setIsLoggedIn, isLoggedIn } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
+  const [ongoingAuditions, setOngoingAuditions] = useState<Audition[]>([]);
+  const [completedAuditions, setCompletedAuditions] = useState<Audition[]>([]);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -18,6 +120,18 @@ const AuditionPage: React.FC = () => {
       setIsLoading(false);
     }
   }, [isLoggedIn, router]);
+
+  useEffect(() => {
+    const now = new Date();
+    const ongoing = allAuditions.filter(
+      (audition) => new Date(audition.endDate) >= now
+    );
+    const completed = allAuditions.filter(
+      (audition) => new Date(audition.endDate) < now
+    );
+    setOngoingAuditions(ongoing);
+    setCompletedAuditions(completed);
+  }, []);
 
   const handleLogout = () => {
     setIsLoggedIn(false);
@@ -40,42 +154,38 @@ const AuditionPage: React.FC = () => {
   ];
 
   if (isLoading) {
-    return null;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
+      <button className="fixed bottom-12 right-12 bg-black text-white px-4 py-2 rounded-lg transition-all hover:scale-105 cursor-pointer">
+        오디션 생성
+      </button>
       <Navigation items={navItems} />
-      <main className="max-w-6xl mx-auto p-4 pt-12">
-        {/* 섹션: 다가오는 오디션 */}
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">다가오는 오디션</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white shadow rounded p-4">
-              <h3 className="text-xl font-bold mb-2">오디션 제목 1</h3>
-              <p className="text-gray-700">일정: 2025-05-01</p>
-              <p className="text-gray-600 mt-2">
-                상세 내용: 지원 자격, 심사 기준 등 오디션에 대한 설명을
-                포함합니다.
-              </p>
-            </div>
-            <div className="bg-white shadow rounded p-4">
-              <h3 className="text-xl font-bold mb-2">오디션 제목 2</h3>
-              <p className="text-gray-700">일정: 2025-06-15</p>
-              <p className="text-gray-600 mt-2">
-                상세 내용: 이번 오디션의 주요 특징 및 참가 정보를 안내합니다.
-              </p>
-            </div>
+      <main className="max-w-7xl mx-auto px-4 pt-12 pb-24">
+        {/* 섹션: 진행중인 오디션 */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-semibold mb-6">진행중인 오디션</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {ongoingAuditions.map((audition) => (
+              <AuditionCard key={audition.id} audition={audition} />
+            ))}
           </div>
         </section>
 
-        {/* 섹션: 과거 오디션 */}
+        {/* 섹션: 지난 오디션 */}
         <section>
-          <h2 className="text-2xl font-semibold mb-4">지난 오디션</h2>
-          <p className="text-gray-700">
-            이전 오디션의 결과와 후기를 확인해보세요.
-          </p>
-          {/* 필요 시 과거 오디션 목록 추가 */}
+          <h2 className="text-2xl font-semibold mb-6">지난 오디션</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {completedAuditions.map((audition) => (
+              <AuditionCard key={audition.id} audition={audition} />
+            ))}
+          </div>
         </section>
       </main>
     </div>

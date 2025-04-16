@@ -22,7 +22,13 @@ export const authService = {
         email,
         password,
       });
-      return response.data;
+
+      const tokenValue = response.headers["authorization"];
+      if (!tokenValue) {
+        throw new Error("로그인 응답에 토큰이 없습니다.");
+      }
+
+      localStorage.setItem("token", tokenValue);
     } catch (error) {
       throw handleApiError(error);
     }

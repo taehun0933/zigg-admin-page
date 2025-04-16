@@ -21,7 +21,6 @@ export default function DashboardPage() {
     }
   }, [isLoggedIn, router]);
 
-  // 로그아웃 핸들러: 로그아웃 시 상태를 false로 업데이트합니다.
   const handleLogout = () => {
     setIsLoggedIn(false);
     router.push("/signin");

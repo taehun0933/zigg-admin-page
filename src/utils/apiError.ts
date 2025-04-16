@@ -1,4 +1,4 @@
-import { ApiErrorType } from "@/types/apiType";
+import { ApiErrorType } from "@/types/apiResponse";
 import { AxiosError } from "axios";
 
 export const handleApiError = (error: unknown): ApiErrorType => {

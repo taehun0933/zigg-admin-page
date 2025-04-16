@@ -55,7 +55,7 @@ const Announcement: React.FC = () => {
             곧 업데이트 될 예정이오니 잠시만 기다려 주세요.
           </p>
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.back()}
             className="mt-12 w-36 h-12 bg-blue-500 text-white rounded-xl text-lg font-bold cursor-pointer"
           >
             돌아가기

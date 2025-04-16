@@ -6,7 +6,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import NavigationBar from "@/components/NavigationBar";
 import Modal from "@/components/Modal";
 import { authService } from "@/apis/login";
-import { ApiErrorType } from "@/types/apiType";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -36,17 +35,6 @@ export default function SignInPage() {
       alert("아이디 또는 비밀번호가 잘못되었습니다!");
     }
   };
-
-  // const handleRegister = async () => {
-  //   try {
-  //     await authService.register("achoom@zigg.com", "soma1511!");
-  //     setIsLoggedIn(true);
-  //     router.push("/dashboard");
-  //   } catch (error) {
-  //     const apiError = error as ApiErrorType;
-  //     alert(apiError.message);
-  //   }
-  // };
 
   return (
     <div className="min-h-screen bg-gray-50">

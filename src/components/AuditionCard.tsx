@@ -1,3 +1,4 @@
+import { useRouter } from "next/navigation";
 import React from "react";
 
 interface Audition {
@@ -14,8 +15,15 @@ interface AuditionCardProps {
 }
 
 const AuditionCard: React.FC<AuditionCardProps> = ({ audition }) => {
+  const router = useRouter();
+
   return (
-    <div className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer">
+    <button
+      className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer"
+      onClick={() => {
+        router.push(`/audition/${audition.id}`);
+      }}
+    >
       <h3 className="text-xl font-bold mb-2">{audition.title}</h3>
       <p className="text-gray-700 mb-2">
         {audition.startDate} ~ {audition.endDate}
@@ -26,7 +34,7 @@ const AuditionCard: React.FC<AuditionCardProps> = ({ audition }) => {
       <p className="text-gray-600">
         선정 인원: {audition.selectedApplicants}명
       </p>
-    </div>
+    </button>
   );
 };
 

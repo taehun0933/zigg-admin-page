@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navigation, { NavItem } from "@/components/NavigationBar";
 import AuditionCard from "@/components/AuditionCard";
 import { useAuth } from "@/contexts/AuthContext";
 import Modal from "@/components/Modal";
+import { getAuditions } from "@/apis/audition";
 
 interface Audition {
   id: number;
@@ -115,6 +116,21 @@ const AuditionPage: React.FC = () => {
   const [completedAuditions, setCompletedAuditions] = useState<Audition[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // 이미지 업로드 로직
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadedImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   useEffect(() => {
     if (!isLoggedIn) {
       router.replace("/signin");
@@ -173,31 +189,52 @@ const AuditionPage: React.FC = () => {
       >
         <div className="flex flex-col md:flex-row gap-8">
           {/* 왼쪽: Upload Photo */}
-          <div className="flex-1 flex items-center justify-center bg-gray-100 min-h-[300px]">
-            <span className="text-2xl font-bold">Upload Photo</span>
+          <div
+            className="flex-1 flex items-center justify-center bg-gray-100 min-h-[300px] cursor-pointer relative overflow-hidden"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploadedImage ? (
+              <img
+                src={uploadedImage}
+                alt="Uploaded"
+                className="object-contain max-h-full max-w-full"
+              />
+            ) : (
+              <span className="text-2xl font-bold text-gray-400">
+                Upload Photo
+              </span>
+            )}
+            {/* 클릭 막기 */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
           </div>
 
           {/* 오른쪽: Form 입력 */}
           <div className="flex-1 space-y-4">
             <div>
-              <label className="block font-semibold mb-1">Audition Name</label>
+              <label className="block font-semibold mb-1">오디션 제목</label>
               <input
                 type="text"
-                placeholder="Enter audition name"
+                placeholder="EX)JYP Audition"
                 className="w-full border border-gray-300 rounded p-2"
               />
             </div>
 
             <div className="flex gap-4">
               <div className="flex-1">
-                <label className="block font-semibold mb-1">Start Date</label>
+                <label className="block font-semibold mb-1">시작일</label>
                 <input
                   type="date"
                   className="w-full border border-gray-300 rounded p-2"
                 />
               </div>
               <div className="flex-1">
-                <label className="block font-semibold mb-1">End Date</label>
+                <label className="block font-semibold mb-1">종료일</label>
                 <input
                   type="date"
                   className="w-full border border-gray-300 rounded p-2"
@@ -209,7 +246,7 @@ const AuditionPage: React.FC = () => {
               <label className="block font-semibold mb-1">지원자격</label>
               <input
                 type="text"
-                placeholder="Add a brief introduction"
+                placeholder="EX)키 150cm 이상"
                 className="w-full border border-gray-300 rounded p-2"
               />
             </div>
@@ -218,13 +255,13 @@ const AuditionPage: React.FC = () => {
               <label className="block font-semibold mb-1">간단한 설명</label>
               <input
                 type="text"
-                placeholder="Add a brief introduction"
+                placeholder="EX)--아이돌이 속한 기획사 오디션입니다."
                 className="w-full border border-gray-300 rounded p-2"
               />
             </div>
 
             <div className="flex justify-end pt-2">
-              <button className="bg-black text-white px-6 py-2 rounded">
+              <button className="bg-black text-white px-6 py-2 rounded cursor-pointer">
                 생성하기
               </button>
             </div>

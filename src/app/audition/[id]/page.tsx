@@ -7,7 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import Modal from "@/components/Modal";
 import { AuditionProfileType } from "@/types/audition";
 import ApplicantCard from "@/components/ApplicantCard";
-
+import { Pagination } from "@mui/material";
+import ApplicantDetailModalContent from "@/components/ApplicantDetailModalContent";
 const mockApplicants: AuditionProfileType[] = [
   {
     id: 1,
@@ -21,7 +22,7 @@ const mockApplicants: AuditionProfileType[] = [
     images: [
       {
         id: 1,
-        url: "/profile-placeholder.png", // public 폴더에 placeholder 이미지 하나 넣어두면 됨
+        url: "/profile-placeholder.png",
         width: 300,
         height: 300,
         uploadState: "PENDING",
@@ -63,6 +64,114 @@ const mockApplicants: AuditionProfileType[] = [
     auditionId: 1,
     createdAt: new Date().toISOString(),
   },
+  {
+    id: 3,
+    name: "김민지",
+    ageOrYear: "20",
+    height: "162",
+    weight: "48kg",
+    gender: "여",
+    nation: "대한민국",
+    desiredPosition: "보컬",
+    images: [
+      {
+        id: 3,
+        url: "/profile-placeholder.png",
+        width: 300,
+        height: 300,
+        uploadState: "PENDING",
+      },
+    ],
+    videos: [],
+    instagramId: "https://instagram.com/minji_vocal",
+    contactInfo: "010-2222-3333",
+    isLiked: false,
+    isScrap: false,
+    userId: 3,
+    auditionId: 1,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 4,
+    name: "이서준",
+    ageOrYear: "24",
+    height: "181",
+    weight: "75kg",
+    gender: "남",
+    nation: "일본",
+    desiredPosition: "래퍼",
+    images: [
+      {
+        id: 4,
+        url: "/profile-placeholder.png",
+        width: 300,
+        height: 300,
+        uploadState: "PENDING",
+      },
+    ],
+    videos: [],
+    instagramId: "https://instagram.com/seojoon_rap",
+    contactInfo: "010-4444-5555",
+    isLiked: true,
+    isScrap: true,
+    userId: 4,
+    auditionId: 1,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 5,
+    name: "박하늘",
+    ageOrYear: "19",
+    height: "168",
+    weight: "52kg",
+    gender: "여",
+    nation: "중국",
+    desiredPosition: "댄서",
+    images: [
+      {
+        id: 5,
+        url: "/profile-placeholder.png",
+        width: 300,
+        height: 300,
+        uploadState: "PENDING",
+      },
+    ],
+    videos: [],
+    instagramId: "https://instagram.com/haneul_dance",
+    contactInfo: "",
+    isLiked: false,
+    isScrap: false,
+    userId: 5,
+    auditionId: 1,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 6,
+    name: "정유진",
+    ageOrYear: "23",
+    height: "170",
+    weight: "54kg",
+    gender: "여",
+    nation: "베트남",
+    desiredPosition: "올라운더",
+    images: [
+      {
+        id: 6,
+        url: "/profile-placeholder.png",
+        width: 300,
+        height: 300,
+        uploadState: "PENDING",
+      },
+    ],
+    videos: [],
+    instagramId: "",
+    contactInfo: "010-6666-7777",
+    isLiked: false,
+    isScrap: true,
+    userId: 6,
+    auditionId: 1,
+    createdAt: new Date().toISOString(),
+  },
 ];
 
 const AuditionDetailPage: React.FC = () => {
@@ -70,6 +179,16 @@ const AuditionDetailPage: React.FC = () => {
   const { setIsLoggedIn, isLoggedIn } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const [page, setPage] = useState(1);
+  const handlePageChange = (
+    event: React.ChangeEvent<unknown>,
+    value: number
+  ) => {
+    setPage(value);
+  };
+
+  console.log(page);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -111,6 +230,15 @@ const AuditionDetailPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="지원자 세부정보"
+        sizeMode="LARGE"
+      >
+        <ApplicantDetailModalContent />
+      </Modal>
+
       <Navigation items={navItems} />
       <main className="max-w-7xl mx-auto px-4 pt-12 pb-24">
         {/* 섹션: 오디션 지원자 리스트 */}
@@ -118,10 +246,24 @@ const AuditionDetailPage: React.FC = () => {
           <h2 className="text-2xl font-semibold mb-6 text-center">
             오디션 지원자 리스트
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 justify-items-center">
             {mockApplicants.map((profile) => (
-              <ApplicantCard auditionProfile={profile} key={profile.id} />
+              <ApplicantCard
+                auditionProfile={profile}
+                key={profile.id}
+                handleOnClick={() => {
+                  setIsModalOpen(true);
+                }}
+              />
             ))}
+          </div>
+          <div className="flex justify-center mt-8">
+            <Pagination
+              count={10}
+              showFirstButton
+              showLastButton
+              onChange={handlePageChange}
+            />
           </div>
         </section>
       </main>

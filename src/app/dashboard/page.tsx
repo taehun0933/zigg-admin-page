@@ -57,13 +57,13 @@ export default function DashboardPage() {
       {/* 메인 콘텐츠: DashboardCard를 사용하여 카드 전체 클릭 시 해당 페이지로 이동 */}
       <main className="max-w-6xl mx-auto p-4 grid grid-cols-1 md:grid-cols-2 gap-8 pt-12">
         <DashboardCard
-          title="오디션 현황"
-          description="최신 오디션 정보와 진행 중인 일정을 확인하세요. 다가오는 오디션 이벤트 및 지원 현황도 함께 제공합니다."
+          title="오디션 관리"
+          description="새로운 오디션을 생성하고, 진행 중인 오디션의 지원자 정보를 조회해 보세요."
           onClick={() => router.push("/audition")}
         />
         <DashboardCard
           title="공지사항"
-          description="최신 업데이트, 중요한 공지 및 시스템 변경 사항을 확인하세요. 모든 관리자에게 필요한 정보가 담겨 있습니다."
+          description="ZIGG의 공지사항을 작성해 보세요. 현재는 작업 중인 기능입니다."
           onClick={() => router.push("/announcement")}
         />
       </main>

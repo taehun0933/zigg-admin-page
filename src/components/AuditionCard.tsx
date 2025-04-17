@@ -19,7 +19,7 @@ const AuditionCard: React.FC<AuditionCardProps> = ({ audition }) => {
 
   return (
     <button
-      className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer"
+      className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer text-left"
       onClick={() => {
         router.push(`/audition/${audition.id}`);
       }}

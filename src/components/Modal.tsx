@@ -36,8 +36,14 @@ const Modal: React.FC<ModalProps> = ({
   }[sizeMode];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className={`bg-white rounded-lg shadow-lg w-11/12 ${widthClass}`}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={onClose} // 바깥쪽 클릭 시 닫힘
+    >
+      <div
+        className={`bg-white rounded-lg shadow-lg w-11/12 ${widthClass}`}
+        onClick={(e) => e.stopPropagation()} // 내부 클릭 시 닫힘 방지
+      >
         {/* 모달 헤더 */}
         <div className="flex justify-between items-center border-b border-gray-300 p-4">
           {title && <h2 className="text-xl font-bold">{title}</h2>}
@@ -64,7 +70,7 @@ const Modal: React.FC<ModalProps> = ({
 
         {/* 모달 내용 */}
         <div
-          className="p-4 overflow-y-scroll max-h-[600px]"
+          className="p-4 overflow-y-auto max-h-[80vh]"
           style={{
             scrollbarWidth: "none",
           }}

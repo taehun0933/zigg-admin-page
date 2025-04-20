@@ -19,7 +19,7 @@ const AuditionCard: React.FC<AuditionCardProps> = ({ audition }) => {
       <h3 className="text-xl font-bold mb-4">{audition.title}</h3>
       <img
         src={audition.thumbnail.imageKey}
-        alt="썸네일"
+        alt="오디션 썸네일"
         className="w-2/3 aspect-square object-cover rounded mb-8"
       />
       <p className="text-gray-700 mb-2">

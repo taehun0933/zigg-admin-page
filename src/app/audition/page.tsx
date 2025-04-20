@@ -7,6 +7,7 @@ import AuditionCard from "@/components/AuditionCard";
 import { useAuth } from "@/contexts/AuthContext";
 import Modal from "@/components/Modal";
 import { getAuditions, postNewAudition } from "@/apis/audition";
+import { getUrlForUploadImage, putImageToPresignedUrl } from "@/apis/media";
 
 export interface Audition {
   id: number;
@@ -27,20 +28,34 @@ const AuditionPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [auditions, setAuditions] = useState<Audition[]>([]);
   const [ongoingAuditions, setOngoingAuditions] = useState<Audition[]>([]);
+  const [upcomingAuditions, setUpcomingAuditions] = useState<Audition[]>([]);
   const [completedAuditions, setCompletedAuditions] = useState<Audition[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [imageMeta, setImageMeta] = useState<{
+    extension: string;
+    width: number;
+    height: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [auditionForm, setAuditionForm] = useState({
     title: "",
     company: "",
     qualification: "",
-    thumbnailId: 0, // 아직 업로드 안 붙였으므로 고정값
+    thumbnailId: 0,
     startDate: "",
     endDate: "",
   });
+
+  const getAuditionList = () => {
+    getAuditions()
+      .then((data) => {
+        setAuditions(data);
+      })
+      .catch(console.error);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -50,19 +65,71 @@ const AuditionPage: React.FC = () => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const extension = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
       const reader = new FileReader();
+      const image = new Image();
+
       reader.onloadend = () => {
-        setUploadedImage(reader.result as string);
+        const base64 = reader.result as string;
+        setUploadedImage(base64);
+
+        image.onload = () => {
+          setImageMeta({
+            extension,
+            width: image.naturalWidth,
+            height: image.naturalHeight,
+          });
+        };
+
+        image.src = base64;
       };
+
       reader.readAsDataURL(file);
     }
   };
 
   const handleSubmit = async () => {
+    const hasEmptyField = Object.values(auditionForm).some((v) => v === "");
+
+    if (hasEmptyField) {
+      alert("모든 정보를 입력해주세요.");
+      return;
+    }
+
+    if (!uploadedImage || !imageMeta) {
+      alert("이미지는 필수로 업로드해야 합니다.");
+      return;
+    }
+
     try {
-      await postNewAudition(auditionForm);
+      const { contentId, url } = await getUrlForUploadImage({
+        uploadPurposeQuery: "AUDITION_THUMBNAIL",
+        body: {
+          extension: imageMeta.extension,
+          width: imageMeta.width,
+          height: imageMeta.height,
+        },
+      });
+
+      const res = await fetch(uploadedImage!);
+      const blob = await res.blob();
+
+      const uploadSuccess = await putImageToPresignedUrl({
+        presignedUrl: url,
+        file: blob,
+        contentType: `image/${imageMeta.extension}`,
+      });
+
+      if (!uploadSuccess) {
+        alert("이미지 업로드에 실패했습니다.");
+        return;
+      }
+
+      const finalForm = { ...auditionForm, thumbnailId: contentId };
+      await postNewAudition(finalForm);
       alert("오디션이 생성되었습니다!");
       setIsModalOpen(false);
+      getAuditionList();
     } catch (error) {
       alert("오류 발생: " + String(error));
     }
@@ -77,22 +144,24 @@ const AuditionPage: React.FC = () => {
   }, [isLoggedIn, router]);
 
   useEffect(() => {
-    getAuditions()
-      .then((data) => {
-        setAuditions(data);
-      })
-      .catch(console.error);
+    getAuditionList();
   }, []);
 
   useEffect(() => {
     const now = new Date();
-    const ongoing = auditions.filter(
-      (audition) => new Date(audition.endDate) >= now
+
+    const sorted = [...auditions].sort(
+      (a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
     );
-    const completed = auditions.filter(
-      (audition) => new Date(audition.endDate) < now
+
+    const ongoing = sorted.filter(
+      (a) => new Date(a.startDate) <= now && new Date(a.endDate) >= now
     );
+    const upcoming = sorted.filter((a) => new Date(a.startDate) > now);
+    const completed = sorted.filter((a) => new Date(a.endDate) < now);
+
     setOngoingAuditions(ongoing);
+    setUpcomingAuditions(upcoming);
     setCompletedAuditions(completed);
   }, [auditions]);
 
@@ -124,7 +193,6 @@ const AuditionPage: React.FC = () => {
         sizeMode="LARGE"
       >
         <div className="flex flex-col md:flex-row gap-8">
-          {/* 왼쪽: 이미지 업로드 */}
           <div
             className="flex-1 flex items-center justify-center bg-gray-100 min-h-[300px] cursor-pointer relative overflow-hidden"
             onClick={() => fileInputRef.current?.click()}
@@ -136,9 +204,14 @@ const AuditionPage: React.FC = () => {
                 className="object-contain max-h-full max-w-full"
               />
             ) : (
-              <span className="text-2xl font-bold text-gray-400">
-                Upload Photo
-              </span>
+              <div className="flex flex-col text-center">
+                <span className="text-2xl font-bold text-gray-400">
+                  이미지 업로드
+                </span>
+                <span className="text-lg font-bold text-gray-400">
+                  (1:1 비율 권장)
+                </span>
+              </div>
             )}
             <input
               ref={fileInputRef}
@@ -149,7 +222,6 @@ const AuditionPage: React.FC = () => {
             />
           </div>
 
-          {/* 오른쪽: 입력 폼 */}
           <div className="flex-1 space-y-4">
             <div>
               <label className="block font-semibold mb-1">오디션 제목</label>
@@ -205,7 +277,7 @@ const AuditionPage: React.FC = () => {
                 type="text"
                 value={auditionForm.qualification}
                 onChange={handleInputChange}
-                placeholder="EX)키 150cm 이상"
+                placeholder="EX) 키 150cm 이상"
                 className="w-full border border-gray-300 rounded p-2"
               />
             </div>
@@ -230,6 +302,7 @@ const AuditionPage: React.FC = () => {
       </button>
 
       <Navigation items={navItems} />
+
       <main className="max-w-7xl mx-auto px-4 pt-12 pb-24">
         <section className="mb-12">
           <h2 className="text-2xl font-semibold mb-6">진행중인 오디션</h2>
@@ -238,6 +311,19 @@ const AuditionPage: React.FC = () => {
               <div>조건에 해당하는 오디션 정보가 없습니다!</div>
             ) : (
               ongoingAuditions.map((audition) => (
+                <AuditionCard key={audition.id} audition={audition} />
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="mb-12">
+          <h2 className="text-2xl font-semibold mb-6">예정된 오디션</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {upcomingAuditions.length === 0 ? (
+              <div>조건에 해당하는 오디션 정보가 없습니다!</div>
+            ) : (
+              upcomingAuditions.map((audition) => (
                 <AuditionCard key={audition.id} audition={audition} />
               ))
             )}

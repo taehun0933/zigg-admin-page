@@ -1,7 +1,7 @@
 import { handleApiError } from "@/utils/apiError";
 import axios from "axios";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL_FOR_ADMIN;
 
 export const authService = {
   register: async (email: string, password: string) => {

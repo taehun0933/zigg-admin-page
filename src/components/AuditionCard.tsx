@@ -1,14 +1,6 @@
+import { Audition } from "@/app/audition/page";
 import { useRouter } from "next/navigation";
 import React from "react";
-
-interface Audition {
-  id: number;
-  title: string;
-  startDate: string;
-  endDate: string;
-  totalApplicants: number;
-  selectedApplicants: number;
-}
 
 interface AuditionCardProps {
   audition: Audition;
@@ -24,16 +16,21 @@ const AuditionCard: React.FC<AuditionCardProps> = ({ audition }) => {
         router.push(`/audition/${audition.id}`);
       }}
     >
-      <h3 className="text-xl font-bold mb-2">{audition.title}</h3>
+      <h3 className="text-xl font-bold mb-4">{audition.title}</h3>
+      <img
+        src={audition.thumbnail.imageKey}
+        alt="썸네일"
+        className="w-2/3 aspect-square object-cover rounded mb-8"
+      />
       <p className="text-gray-700 mb-2">
         {audition.startDate} ~ {audition.endDate}
       </p>
-      <p className="text-gray-600 mb-2">
+      {/* <p className="text-gray-600 mb-2">
         전체 지원자: {audition.totalApplicants}명
       </p>
       <p className="text-gray-600">
         선정 인원: {audition.selectedApplicants}명
-      </p>
+      </p> */}
     </button>
   );
 };

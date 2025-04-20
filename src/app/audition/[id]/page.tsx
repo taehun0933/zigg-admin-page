@@ -188,8 +188,6 @@ const AuditionDetailPage: React.FC = () => {
     setPage(value);
   };
 
-  console.log(page);
-
   useEffect(() => {
     if (!isLoggedIn) {
       router.replace("/signin");

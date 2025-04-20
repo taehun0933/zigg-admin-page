@@ -59,15 +59,15 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({
       </p>
 
       {instagramId ? (
-        <button
+        <a
           className="text-sm text-blue-500 underline cursor-pointer"
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // 부모 button 클릭 방지
             window.open(instagramId, "_blank");
           }}
         >
           Instagram Link
-        </button>
+        </a>
       ) : (
         <span className="text-sm text-gray-400">인스타그램 정보 없음</span>
       )}

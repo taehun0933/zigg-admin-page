@@ -25,3 +25,19 @@ export const postNewAudition = async (body: {
     throw handleApiError(error);
   }
 };
+
+export const getAuditionInfo = async (auditionId: number) => {
+  try {
+    const response = await apiClient.get(`/auditions/${auditionId}`, {
+      params: {
+        page: 0,
+        size: 1,
+        sort: ["test"], // 예시: createdAt 기준 내림차순
+      },
+    });
+    console.log(response.data);
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};

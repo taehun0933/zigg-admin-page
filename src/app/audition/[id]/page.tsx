@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Navigation, { NavItem } from "@/components/NavigationBar";
 import { useAuth } from "@/contexts/AuthContext";
 import Modal from "@/components/Modal";
@@ -9,6 +9,7 @@ import { AuditionProfileType } from "@/types/audition";
 import ApplicantCard from "@/components/ApplicantCard";
 import { Pagination } from "@mui/material";
 import ApplicantDetailModalContent from "@/components/ApplicantDetailModalContent";
+import { getAuditionInfo } from "@/apis/audition";
 const mockApplicants: AuditionProfileType[] = [
   {
     id: 1,
@@ -196,7 +197,12 @@ const AuditionDetailPage: React.FC = () => {
     }
   }, [isLoggedIn, router]);
 
-  useEffect(() => {}, []);
+  const params = useParams();
+  const id = params?.id; // 문자열로 나옴
+
+  useEffect(() => {
+    getAuditionInfo(id);
+  }, []);
 
   const handleLogout = () => {
     setIsLoggedIn(false);

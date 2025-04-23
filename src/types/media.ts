@@ -1,9 +1,9 @@
 export interface MediaImageType {
-  imageKey: "string";
-  onClickUrl: "string";
+  imageKey: string;
+  onClickUrl: string;
 }
 
 export interface MediaVideoType {
-  videoUrl: "string";
-  videoDuration: "string";
+  videoUrl: string;
+  videoDuration: string;
 }

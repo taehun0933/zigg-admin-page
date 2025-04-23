@@ -1,8 +1,12 @@
 "use client";
 
+import { likeApplicant, scrapApplicant } from "@/apis/audition";
 import { AuditionProfileType } from "@/types/audition";
 import React from "react";
-// import { Bookmark, Heart } from "lucide-react"; // 원하는 아이콘 라이브러리로 교체 가능
+import { IoBook, IoBookmark } from "react-icons/io5";
+import { IoBookmarkOutline } from "react-icons/io5";
+import { IoHeartOutline } from "react-icons/io5";
+import { IoHeartSharp } from "react-icons/io5";
 
 interface ApplicantCardProps {
   auditionProfile: AuditionProfileType;
@@ -23,24 +27,46 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({
     desiredPosition,
     images,
     instagramId,
+    auditionId,
+    contactInfo,
+    createdAt,
+    id,
+    isLiked,
+    isScrap,
+    userId,
+    videos,
   } = auditionProfile;
 
-  const profileImage = images?.[0]?.url || "/default-profile.png";
+  // todo: 추후 수정
+  const profileImage = images || "/default-profile.png";
 
   return (
     <button
-      className="relative w-full max-w-sm p-4 border border-gray-400 rounded-lg shadow-md bg-white flex flex-col items-center text-center hover:scale-[102%] transition-all cursor-pointer"
+      className="relative w-full max-w-sm p-4 border border-gray-400 rounded-lg shadow-md bg-white flex flex-col items-center text-center cursor-pointer transition-all hover:shadow-lg"
       onClick={handleOnClick}
     >
-      <div className="absolute top-2 left-2 text-gray-400">
-        {/* <Bookmark size={20} /> */}
+      {/* todo: 백엔드쪽 데이터 추가한 후, 마저 로직 완성하기 */}
+      <div
+        className="absolute top-2 left-2 text-gray-400"
+        onClick={async (e) => {
+          e.stopPropagation();
+          await scrapApplicant(id);
+        }}
+      >
+        <IoBookmarkOutline size={20} />
       </div>
-      <div className="absolute top-2 right-2 text-gray-400">
-        {/* <Heart size={20} /> */}
+      <div
+        className="absolute top-2 right-2 text-gray-400"
+        onClick={async (e) => {
+          e.stopPropagation();
+          await likeApplicant(id);
+        }}
+      >
+        <IoHeartOutline size={20} />
       </div>
 
       {/* 프로필 이미지 */}
-      <div className="w-32 h-32 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden mb-4">
+      <div className="w-40 h-40 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden mb-4">
         <img
           src={profileImage}
           alt="프로필 사진"

@@ -10,23 +10,20 @@ import ApplicantCard from "@/components/ApplicantCard";
 import { Pagination } from "@mui/material";
 import ApplicantDetailModalContent from "@/components/ApplicantDetailModalContent";
 import { getAuditionInfo } from "@/apis/audition";
-const mockApplicants: AuditionProfileType[] = [
+export const mockApplicants: AuditionProfileType[] = [
   {
     id: 1,
     name: "권태훈",
     ageOrYear: "22",
     height: "190",
-    weight: "135kg",
+    weight: "135",
     gender: "남",
     nation: "스리랑카",
     desiredPosition: "비주얼",
     images: [
       {
-        id: 1,
-        url: "/profile-placeholder.png",
-        width: 300,
-        height: 300,
-        uploadState: "PENDING",
+        imageKey: "profile-1",
+        onClickUrl: "/profile-placeholder.png",
       },
     ],
     videos: [],
@@ -43,17 +40,14 @@ const mockApplicants: AuditionProfileType[] = [
     name: "홍길동",
     ageOrYear: "25",
     height: "178",
-    weight: "70kg",
+    weight: "70",
     gender: "남",
     nation: "대한민국",
     desiredPosition: "댄서",
     images: [
       {
-        id: 2,
-        url: "/profile-placeholder.png",
-        width: 300,
-        height: 300,
-        uploadState: "PENDING",
+        imageKey: "profile-2",
+        onClickUrl: "/profile-placeholder.png",
       },
     ],
     videos: [],
@@ -70,17 +64,14 @@ const mockApplicants: AuditionProfileType[] = [
     name: "김민지",
     ageOrYear: "20",
     height: "162",
-    weight: "48kg",
+    weight: "48",
     gender: "여",
     nation: "대한민국",
     desiredPosition: "보컬",
     images: [
       {
-        id: 3,
-        url: "/profile-placeholder.png",
-        width: 300,
-        height: 300,
-        uploadState: "PENDING",
+        imageKey: "profile-3",
+        onClickUrl: "/profile-placeholder.png",
       },
     ],
     videos: [],
@@ -97,17 +88,14 @@ const mockApplicants: AuditionProfileType[] = [
     name: "이서준",
     ageOrYear: "24",
     height: "181",
-    weight: "75kg",
+    weight: "75",
     gender: "남",
     nation: "일본",
     desiredPosition: "래퍼",
     images: [
       {
-        id: 4,
-        url: "/profile-placeholder.png",
-        width: 300,
-        height: 300,
-        uploadState: "PENDING",
+        imageKey: "profile-4",
+        onClickUrl: "/profile-placeholder.png",
       },
     ],
     videos: [],
@@ -124,17 +112,14 @@ const mockApplicants: AuditionProfileType[] = [
     name: "박하늘",
     ageOrYear: "19",
     height: "168",
-    weight: "52kg",
+    weight: "52",
     gender: "여",
     nation: "중국",
     desiredPosition: "댄서",
     images: [
       {
-        id: 5,
-        url: "/profile-placeholder.png",
-        width: 300,
-        height: 300,
-        uploadState: "PENDING",
+        imageKey: "profile-5",
+        onClickUrl: "/profile-placeholder.png",
       },
     ],
     videos: [],
@@ -151,17 +136,14 @@ const mockApplicants: AuditionProfileType[] = [
     name: "정유진",
     ageOrYear: "23",
     height: "170",
-    weight: "54kg",
+    weight: "54",
     gender: "여",
     nation: "베트남",
     desiredPosition: "올라운더",
     images: [
       {
-        id: 6,
-        url: "/profile-placeholder.png",
-        width: 300,
-        height: 300,
-        uploadState: "PENDING",
+        imageKey: "profile-6",
+        onClickUrl: "/profile-placeholder.png",
       },
     ],
     videos: [],
@@ -198,7 +180,7 @@ const AuditionDetailPage: React.FC = () => {
   }, [isLoggedIn, router]);
 
   const params = useParams();
-  const id = params?.id; // 문자열로 나옴
+  const id = Number(params?.id);
 
   useEffect(() => {
     getAuditionInfo(id);
@@ -244,7 +226,7 @@ const AuditionDetailPage: React.FC = () => {
       </Modal>
 
       <Navigation items={navItems} />
-      <main className="max-w-7xl mx-auto px-4 pt-12 pb-24">
+      <main className="max-w-7xl mx-auto px-4 pt-8 pb-24">
         {/* 섹션: 오디션 지원자 리스트 */}
         <section className="mb-12">
           <h2 className="text-2xl font-semibold mb-6 text-center">

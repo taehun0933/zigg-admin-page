@@ -1,3 +1,4 @@
+import { AuditionInfoType } from "@/types/audition";
 import apiClient from "@/utils/apiClient";
 import { handleApiError } from "@/utils/apiError";
 
@@ -26,38 +27,52 @@ export const postNewAudition = async (body: {
   }
 };
 
-export const getAuditionInfo = async (auditionId: number) => {
+export const getAuditionInfo = async (body: {
+  auditionId: number;
+  pageNum: number;
+}): Promise<AuditionInfoType> => {
   try {
-    const response = await apiClient.get(`/auditions/${auditionId}`, {
-      params: {
-        page: 0,
-        size: 6,
-        // sort: ["test"], // 예시: createdAt 기준 내림차순
-      },
-    });
+    const response = await apiClient.get<AuditionInfoType>(
+      `/auditions/${body.auditionId}`,
+      {
+        params: {
+          page: body.pageNum,
+        },
+      }
+    );
+
     console.log(response.data);
+
     return response.data;
   } catch (error) {
     throw handleApiError(error);
   }
 };
 
-export const scrapApplicant = async (applicationId: number) => {
+export const scrapApplicant = async (body: {
+  applicationId: number;
+  auditionId: number;
+}) => {
   try {
     const response = await apiClient.post(
-      `/auditions/applications/${applicationId}/scrap`
+      `/auditions/${body.auditionId}/applications/${body.applicationId}/scrap`
     );
+
     return response.data;
   } catch (error) {
     throw handleApiError(error);
   }
 };
 
-export const likeApplicant = async (applicationId: number) => {
+export const likeApplicant = async (body: {
+  applicationId: number;
+  auditionId: number;
+}) => {
   try {
     const response = await apiClient.post(
-      `/auditions/applications/${applicationId}/like`
+      `/auditions/${body.auditionId}/applications/${body.applicationId}/like`
     );
+
     return response.data;
   } catch (error) {
     throw handleApiError(error);

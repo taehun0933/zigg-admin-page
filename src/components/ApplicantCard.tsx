@@ -3,7 +3,7 @@
 import { likeApplicant, scrapApplicant } from "@/apis/audition";
 import { AuditionProfileType } from "@/types/audition";
 import React from "react";
-import { IoBook, IoBookmark } from "react-icons/io5";
+import { IoBook, IoBookmark, IoHeart } from "react-icons/io5";
 import { IoBookmarkOutline } from "react-icons/io5";
 import { IoHeartOutline } from "react-icons/io5";
 import { IoHeartSharp } from "react-icons/io5";
@@ -37,32 +37,30 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({
     videos,
   } = auditionProfile;
 
-  // todo: 추후 수정
-  const profileImage = images || "/default-profile.png";
+  const profileImage = images[0].imageKey || "/default-profile.png";
 
   return (
     <button
       className="relative w-full max-w-sm p-4 border border-gray-400 rounded-lg shadow-md bg-white flex flex-col items-center text-center cursor-pointer transition-all hover:shadow-lg"
       onClick={handleOnClick}
     >
-      {/* todo: 백엔드쪽 데이터 추가한 후, 마저 로직 완성하기 */}
       <div
         className="absolute top-2 left-2 text-gray-400"
         onClick={async (e) => {
           e.stopPropagation();
-          await scrapApplicant(id);
+          await scrapApplicant({ applicationId: id, auditionId });
         }}
       >
-        <IoBookmarkOutline size={20} />
+        {isScrap ? <IoBookmark size={20} /> : <IoBookmarkOutline size={20} />}
       </div>
       <div
         className="absolute top-2 right-2 text-gray-400"
         onClick={async (e) => {
           e.stopPropagation();
-          await likeApplicant(id);
+          await likeApplicant({ applicationId: id, auditionId });
         }}
       >
-        <IoHeartOutline size={20} />
+        {isLiked ? <IoHeart size={20} /> : <IoHeartOutline size={20} />}
       </div>
 
       {/* 프로필 이미지 */}
@@ -89,7 +87,7 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({
           className="text-sm text-blue-500 underline cursor-pointer"
           onClick={(e) => {
             e.stopPropagation(); // 부모 button 클릭 방지
-            window.open(instagramId, "_blank");
+            window.open(`https://www.instagram.com/${instagramId}`, "_blank");
           }}
         >
           Instagram Link
@@ -100,7 +98,7 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({
 
       {/* 하단 정보: 성별 / 키 / 몸무게 */}
       <p className="mt-4 text-lg font-bold">
-        {height} | {weight} | {ageOrYear}세
+        {height} | {weight} | {ageOrYear}년생
       </p>
     </button>
   );

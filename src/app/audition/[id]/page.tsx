@@ -1,190 +1,64 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Navigation, { NavItem } from "@/components/NavigationBar";
 import { useAuth } from "@/contexts/AuthContext";
 import Modal from "@/components/Modal";
-import { AuditionProfileType } from "@/types/audition";
+import { AuditionInfoType, AuditionProfileType } from "@/types/audition";
 import ApplicantCard from "@/components/ApplicantCard";
 import { Pagination } from "@mui/material";
 import ApplicantDetailModalContent from "@/components/ApplicantDetailModalContent";
 import { getAuditionInfo } from "@/apis/audition";
-export const mockApplicants: AuditionProfileType[] = [
-  {
-    id: 1,
-    name: "권태훈",
-    ageOrYear: "22",
-    height: "190",
-    weight: "135",
-    gender: "남",
-    nation: "스리랑카",
-    desiredPosition: "비주얼",
-    images: [
-      {
-        imageKey: "profile-1",
-        onClickUrl: "/profile-placeholder.png",
-      },
-    ],
-    videos: [],
-    instagramId: "https://instagram.com/kwon_taehun",
-    contactInfo: "010-1234-5678",
-    isLiked: false,
-    isScrap: false,
-    userId: 1,
-    auditionId: 1,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 2,
-    name: "홍길동",
-    ageOrYear: "25",
-    height: "178",
-    weight: "70",
-    gender: "남",
-    nation: "대한민국",
-    desiredPosition: "댄서",
-    images: [
-      {
-        imageKey: "profile-2",
-        onClickUrl: "/profile-placeholder.png",
-      },
-    ],
-    videos: [],
-    instagramId: "",
-    contactInfo: "",
-    isLiked: true,
-    isScrap: false,
-    userId: 2,
-    auditionId: 1,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 3,
-    name: "김민지",
-    ageOrYear: "20",
-    height: "162",
-    weight: "48",
-    gender: "여",
-    nation: "대한민국",
-    desiredPosition: "보컬",
-    images: [
-      {
-        imageKey: "profile-3",
-        onClickUrl: "/profile-placeholder.png",
-      },
-    ],
-    videos: [],
-    instagramId: "https://instagram.com/minji_vocal",
-    contactInfo: "010-2222-3333",
-    isLiked: false,
-    isScrap: false,
-    userId: 3,
-    auditionId: 1,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 4,
-    name: "이서준",
-    ageOrYear: "24",
-    height: "181",
-    weight: "75",
-    gender: "남",
-    nation: "일본",
-    desiredPosition: "래퍼",
-    images: [
-      {
-        imageKey: "profile-4",
-        onClickUrl: "/profile-placeholder.png",
-      },
-    ],
-    videos: [],
-    instagramId: "https://instagram.com/seojoon_rap",
-    contactInfo: "010-4444-5555",
-    isLiked: true,
-    isScrap: true,
-    userId: 4,
-    auditionId: 1,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 5,
-    name: "박하늘",
-    ageOrYear: "19",
-    height: "168",
-    weight: "52",
-    gender: "여",
-    nation: "중국",
-    desiredPosition: "댄서",
-    images: [
-      {
-        imageKey: "profile-5",
-        onClickUrl: "/profile-placeholder.png",
-      },
-    ],
-    videos: [],
-    instagramId: "https://instagram.com/haneul_dance",
-    contactInfo: "",
-    isLiked: false,
-    isScrap: false,
-    userId: 5,
-    auditionId: 1,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 6,
-    name: "정유진",
-    ageOrYear: "23",
-    height: "170",
-    weight: "54",
-    gender: "여",
-    nation: "베트남",
-    desiredPosition: "올라운더",
-    images: [
-      {
-        imageKey: "profile-6",
-        onClickUrl: "/profile-placeholder.png",
-      },
-    ],
-    videos: [],
-    instagramId: "",
-    contactInfo: "010-6666-7777",
-    isLiked: false,
-    isScrap: true,
-    userId: 6,
-    auditionId: 1,
-    createdAt: new Date().toISOString(),
-  },
-];
 
 const AuditionDetailPage: React.FC = () => {
   const router = useRouter();
   const { setIsLoggedIn, isLoggedIn } = useAuth();
+  const params = useParams();
+  const id = Number(params?.id);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [applicantInfoWithModal, setApplicantInfoWithModal] =
+    useState<AuditionProfileType | null>(null);
 
-  const [page, setPage] = useState(1);
+  const [currentAuditionInfo, setCurrentAuditionInfo] =
+    useState<AuditionInfoType | null>(null);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  const getAuditionInfoWithPagination = useCallback(
+    async (page: number = 0) => {
+      try {
+        const data = await getAuditionInfo({
+          auditionId: id,
+          pageNum: page,
+        });
+        setCurrentAuditionInfo(data);
+        setTotalPages(data.totalPages);
+        setCurrentPage(page + 1);
+      } catch (error) {
+        console.error(error);
+      }
+    },
+    [id]
+  );
+
   const handlePageChange = (
     event: React.ChangeEvent<unknown>,
     value: number
   ) => {
-    setPage(value);
+    getAuditionInfoWithPagination(value - 1);
   };
 
   useEffect(() => {
     if (!isLoggedIn) {
       router.replace("/signin");
     } else {
+      getAuditionInfoWithPagination(0);
       setIsLoading(false);
     }
-  }, [isLoggedIn, router]);
-
-  const params = useParams();
-  const id = Number(params?.id);
-
-  useEffect(() => {
-    getAuditionInfo(id);
-  }, []);
+  }, [isLoggedIn, router, getAuditionInfoWithPagination]);
 
   const handleLogout = () => {
     setIsLoggedIn(false);
@@ -192,18 +66,9 @@ const AuditionDetailPage: React.FC = () => {
   };
 
   const navItems: NavItem[] = [
-    {
-      label: "오디션 관리",
-      onClick: () => router.push("/audition"),
-    },
-    {
-      label: "공지사항 관리",
-      onClick: () => router.push("/announcement"),
-    },
-    {
-      label: "로그아웃",
-      onClick: handleLogout,
-    },
+    { label: "오디션 관리", onClick: () => router.push("/audition") },
+    { label: "공지사항 관리", onClick: () => router.push("/announcement") },
+    { label: "로그아웃", onClick: handleLogout },
   ];
 
   if (isLoading) {
@@ -218,37 +83,51 @@ const AuditionDetailPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50 font-sans">
       <Modal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setApplicantInfoWithModal(null);
+        }}
         title="지원자 세부정보"
         sizeMode="LARGE"
       >
-        <ApplicantDetailModalContent />
+        <ApplicantDetailModalContent applicantInfo={applicantInfoWithModal} />
       </Modal>
 
       <Navigation items={navItems} />
-      <main className="max-w-7xl mx-auto px-4 pt-8 pb-24">
+
+      <main className="max-w-7xl mx-auto px-4 pt-8 pb-8">
         {/* 섹션: 오디션 지원자 리스트 */}
         <section className="mb-12">
-          <h2 className="text-2xl font-semibold mb-6 text-center">
+          <h2 className="text-2xl font-bold mb-6 text-center">
             오디션 지원자 리스트
           </h2>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 justify-items-center">
-            {mockApplicants.map((profile) => (
-              <ApplicantCard
-                auditionProfile={profile}
-                key={profile.id}
-                handleOnClick={() => {
-                  setIsModalOpen(true);
-                }}
-              />
-            ))}
+            {currentAuditionInfo && currentAuditionInfo.content.length > 0 ? (
+              currentAuditionInfo.content.map((profile) => (
+                <ApplicantCard
+                  key={profile.id}
+                  auditionProfile={profile}
+                  handleOnClick={() => {
+                    setIsModalOpen(true);
+                    setApplicantInfoWithModal(profile);
+                  }}
+                />
+              ))
+            ) : (
+              <div className="col-span-1 md:col-span-2 lg:col-span-3 text-center text-gray-500 py-12">
+                지원자가 없습니다.
+              </div>
+            )}
           </div>
+
           <div className="flex justify-center mt-8">
             <Pagination
-              count={10}
+              count={totalPages}
+              page={currentPage}
+              onChange={handlePageChange}
               showFirstButton
               showLastButton
-              onChange={handlePageChange}
             />
           </div>
         </section>

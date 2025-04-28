@@ -27,17 +27,29 @@ export const postNewAudition = async (body: {
   }
 };
 
+export type AuditionFilterType = "all" | "scrap" | "like";
+
 export const getAuditionInfo = async (body: {
   auditionId: number;
   pageNum: number;
+  filter: AuditionFilterType;
 }): Promise<AuditionInfoType> => {
   try {
+    const params: Record<string, any> = {
+      page: body.pageNum,
+    };
+
+    // filter에 따라 scrap/like 추가
+    if (body.filter === "scrap") {
+      params.scrap = true;
+    } else if (body.filter === "like") {
+      params.like = true;
+    }
+
     const response = await apiClient.get<AuditionInfoType>(
       `/auditions/${body.auditionId}`,
       {
-        params: {
-          page: body.pageNum,
-        },
+        params,
       }
     );
 

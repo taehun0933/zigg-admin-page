@@ -27,38 +27,37 @@ const AuditionDetailPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
-  const getAuditionInfoWithPagination = useCallback(
-    async (page: number = 0) => {
-      try {
-        const data = await getAuditionInfo({
-          auditionId: id,
-          pageNum: page,
-        });
-        setCurrentAuditionInfo(data);
-        setTotalPages(data.totalPages);
-        setCurrentPage(page + 1);
-      } catch (error) {
-        console.error(error);
-      }
-    },
-    [id]
-  );
+  const [filter, setFilter] = useState<"all" | "scrap" | "like">("all");
+
+  const getAuditionInfoData = useCallback(async () => {
+    try {
+      const data = await getAuditionInfo({
+        auditionId: id,
+        pageNum: currentPage - 1, // 서버는 0-index니까
+        filter,
+      });
+      setCurrentAuditionInfo(data);
+      setTotalPages(data.totalPages);
+    } catch (error) {
+      console.error(error);
+    }
+  }, [id, currentPage, filter]);
 
   const handlePageChange = (
     event: React.ChangeEvent<unknown>,
     value: number
   ) => {
-    getAuditionInfoWithPagination(value - 1);
+    setCurrentPage(value); // ❗ API 호출 없음
   };
 
   useEffect(() => {
     if (!isLoggedIn) {
       router.replace("/signin");
     } else {
-      getAuditionInfoWithPagination(0);
+      getAuditionInfoData();
       setIsLoading(false);
     }
-  }, [isLoggedIn, router, getAuditionInfoWithPagination]);
+  }, [isLoggedIn, router, getAuditionInfoData]);
 
   const handleLogout = () => {
     setIsLoggedIn(false);
@@ -96,12 +95,55 @@ const AuditionDetailPage: React.FC = () => {
       <Navigation items={navItems} />
 
       <main className="max-w-7xl mx-auto px-4 pt-8 pb-8">
-        {/* 섹션: 오디션 지원자 리스트 */}
         <section className="mb-12">
-          <h2 className="text-2xl font-bold mb-6 text-center">
-            오디션 지원자 리스트
-          </h2>
+          {/* 제목 + 필터 가로 정렬 */}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold">오디션 지원자 리스트</h2>
 
+            <div className="flex space-x-4">
+              <label className="flex items-center space-x-1">
+                <input
+                  type="radio"
+                  name="filter"
+                  value="all"
+                  checked={filter === "all"}
+                  onChange={() => {
+                    setFilter("all");
+                    setCurrentPage(1); // ❗ 필터 변경 시 1페이지 초기화
+                  }}
+                />
+                <span>모두</span>
+              </label>
+              <label className="flex items-center space-x-1">
+                <input
+                  type="radio"
+                  name="filter"
+                  value="scrap"
+                  checked={filter === "scrap"}
+                  onChange={() => {
+                    setFilter("scrap");
+                    setCurrentPage(1);
+                  }}
+                />
+                <span>북마크만 보기</span>
+              </label>
+              <label className="flex items-center space-x-1">
+                <input
+                  type="radio"
+                  name="filter"
+                  value="like"
+                  checked={filter === "like"}
+                  onChange={() => {
+                    setFilter("like");
+                    setCurrentPage(1);
+                  }}
+                />
+                <span>좋아요만 보기</span>
+              </label>
+            </div>
+          </div>
+
+          {/* 지원자 카드 그리드 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 justify-items-center">
             {currentAuditionInfo && currentAuditionInfo.content.length > 0 ? (
               currentAuditionInfo.content.map((profile) => (
@@ -121,6 +163,7 @@ const AuditionDetailPage: React.FC = () => {
             )}
           </div>
 
+          {/* 페이지네이션 */}
           <div className="flex justify-center mt-8">
             <Pagination
               count={totalPages}

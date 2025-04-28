@@ -9,6 +9,7 @@ export interface AuditionProfileType {
   gender: string;
   nation: string;
   desiredPosition: string;
+  introduction: string;
   images: MediaImageType[];
   videos: MediaVideoType[];
   instagramId: string;
@@ -20,7 +21,6 @@ export interface AuditionProfileType {
   createdAt: string; // ISO string
 }
 
-// todo: 이거 백엔드측에 해석 부탁하기
 export interface AuditionInfoType {
   totalPages: number;
   totalElements: number;

@@ -41,8 +41,6 @@ export const getAuditionInfo = async (body: {
       }
     );
 
-    console.log(response.data);
-
     return response.data;
   } catch (error) {
     throw handleApiError(error);
@@ -58,7 +56,22 @@ export const scrapApplicant = async (body: {
       `/auditions/${body.auditionId}/applications/${body.applicationId}/scrap`
     );
 
-    return response.data;
+    return response.status;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+export const deleteScrapApplicant = async (body: {
+  applicationId: number;
+  auditionId: number;
+}) => {
+  try {
+    const response = await apiClient.delete(
+      `/auditions/${body.auditionId}/applications/${body.applicationId}/scrap`
+    );
+
+    return response.status;
   } catch (error) {
     throw handleApiError(error);
   }
@@ -73,7 +86,22 @@ export const likeApplicant = async (body: {
       `/auditions/${body.auditionId}/applications/${body.applicationId}/like`
     );
 
-    return response.data;
+    return response.status;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+export const deleteLikeApplicant = async (body: {
+  applicationId: number;
+  auditionId: number;
+}) => {
+  try {
+    const response = await apiClient.delete(
+      `/auditions/${body.auditionId}/applications/${body.applicationId}/like`
+    );
+
+    return response.status;
   } catch (error) {
     throw handleApiError(error);
   }

@@ -92,7 +92,7 @@ const ApplicantDetailModalContent: React.FC<
           <label className="block text-sm font-semibold mb-2">자기소개</label>
           <textarea
             readOnly
-            defaultValue={"유저의 개인적인 자기 소개 (추후 API 연동 예정)"}
+            defaultValue={applicantInfo.introduction}
             className="w-full h-40 p-2 border border-gray-300 rounded resize-none bg-white"
           />
         </div>

@@ -1,12 +1,19 @@
 "use client";
 
-import { likeApplicant, scrapApplicant } from "@/apis/audition";
+import {
+  deleteLikeApplicant,
+  deleteScrapApplicant,
+  likeApplicant,
+  scrapApplicant,
+} from "@/apis/audition";
 import { AuditionProfileType } from "@/types/audition";
-import React from "react";
-import { IoBook, IoBookmark, IoHeart } from "react-icons/io5";
-import { IoBookmarkOutline } from "react-icons/io5";
-import { IoHeartOutline } from "react-icons/io5";
-import { IoHeartSharp } from "react-icons/io5";
+import React, { useState } from "react";
+import {
+  IoBookmark,
+  IoBookmarkOutline,
+  IoHeart,
+  IoHeartOutline,
+} from "react-icons/io5";
 
 interface ApplicantCardProps {
   auditionProfile: AuditionProfileType;
@@ -31,13 +38,58 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({
     contactInfo,
     createdAt,
     id,
-    isLiked,
-    isScrap,
     userId,
     videos,
   } = auditionProfile;
 
-  const profileImage = images[0].imageKey || "/default-profile.png";
+  const [isLiked, setIsLiked] = useState(auditionProfile.isLiked);
+  const [isScrap, setIsScrap] = useState(auditionProfile.isScrap);
+
+  const profileImage = images[0]?.imageKey || "/default-profile.png";
+
+  const handleScrapClick = async (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    try {
+      if (isScrap) {
+        const status = await deleteScrapApplicant({
+          applicationId: id,
+          auditionId,
+        });
+        if (status === 200) {
+          setIsScrap(false);
+        }
+      } else {
+        const status = await scrapApplicant({ applicationId: id, auditionId });
+        if (status === 200) {
+          setIsScrap(true);
+        }
+      }
+    } catch (error) {
+      console.error("스크랩 요청 실패", error);
+    }
+  };
+
+  const handleLikeClick = async (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    try {
+      if (isLiked) {
+        const status = await deleteLikeApplicant({
+          applicationId: id,
+          auditionId,
+        });
+        if (status === 200) {
+          setIsLiked(false);
+        }
+      } else {
+        const status = await likeApplicant({ applicationId: id, auditionId });
+        if (status === 200) {
+          setIsLiked(true);
+        }
+      }
+    } catch (error) {
+      console.error("좋아요 요청 실패", error);
+    }
+  };
 
   return (
     <button
@@ -46,19 +98,14 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({
     >
       <div
         className="absolute top-2 left-2 text-gray-400"
-        onClick={async (e) => {
-          e.stopPropagation();
-          await scrapApplicant({ applicationId: id, auditionId });
-        }}
+        onClick={handleScrapClick}
       >
         {isScrap ? <IoBookmark size={20} /> : <IoBookmarkOutline size={20} />}
       </div>
+
       <div
         className="absolute top-2 right-2 text-gray-400"
-        onClick={async (e) => {
-          e.stopPropagation();
-          await likeApplicant({ applicationId: id, auditionId });
-        }}
+        onClick={handleLikeClick}
       >
         {isLiked ? <IoHeart size={20} /> : <IoHeartOutline size={20} />}
       </div>
@@ -77,16 +124,17 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({
         {name} | {desiredPosition}
       </p>
 
-      {/* 국적 / 나이 */}
+      {/* 국적 / 성별 */}
       <p className="text-sm text-gray-500 mt-1">
         {nation} | {gender}
       </p>
 
+      {/* 인스타그램 */}
       {instagramId ? (
         <a
           className="text-sm text-blue-500 underline cursor-pointer"
           onClick={(e) => {
-            e.stopPropagation(); // 부모 button 클릭 방지
+            e.stopPropagation();
             window.open(`https://www.instagram.com/${instagramId}`, "_blank");
           }}
         >
@@ -96,7 +144,7 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({
         <span className="text-sm text-gray-400">인스타그램 정보 없음</span>
       )}
 
-      {/* 하단 정보: 성별 / 키 / 몸무게 */}
+      {/* 키 / 몸무게 / 출생년도 */}
       <p className="mt-4 text-lg font-bold">
         {height} | {weight} | {ageOrYear}년생
       </p>

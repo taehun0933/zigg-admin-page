@@ -11,6 +11,9 @@ import { getUrlForUploadImage, putImageToPresignedUrl } from "@/apis/media";
 
 export interface Audition {
   id: number;
+  applicationCount: number;
+  likeCount: number;
+  scrapCount: number;
   title: string;
   company: string;
   qualification: string;

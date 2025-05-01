@@ -158,7 +158,7 @@ const AuditionDetailPage: React.FC = () => {
               ))
             ) : (
               <div className="col-span-1 md:col-span-2 lg:col-span-3 text-center text-gray-500 py-12">
-                지원자가 없습니다.
+                조건에 해당하는 지원자가 없습니다.
               </div>
             )}
           </div>

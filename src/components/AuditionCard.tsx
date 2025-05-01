@@ -16,7 +16,9 @@ const AuditionCard: React.FC<AuditionCardProps> = ({ audition }) => {
         router.push(`/audition/${audition.id}`);
       }}
     >
-      <h3 className="text-xl font-bold mb-4">{audition.title}</h3>
+      <h3 className="text-xl font-bold mb-4 break-words w-full">
+        {audition.title}
+      </h3>
       <img
         src={audition.thumbnail.imageKey}
         alt="오디션 썸네일"

@@ -280,7 +280,7 @@ const AuditionPage: React.FC = () => {
                 type="text"
                 value={auditionForm.qualification}
                 onChange={handleInputChange}
-                placeholder="EX) 키 150cm 이상"
+                placeholder="콤마(,)를 사용해 조건을 여러 개 붙여서 작성해 주세요. EX)A,B,C"
                 className="w-full border border-gray-300 rounded p-2"
               />
             </div>

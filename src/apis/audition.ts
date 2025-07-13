@@ -48,7 +48,7 @@ export const getAuditionInfo = async (body: {
     }
 
     const response = await apiClient.get<AuditionInfoType>(
-      `/auditions/${body.auditionId}`,
+      `/auditions/${body.auditionId}/applications`,
       {
         params,
       }

@@ -99,47 +99,54 @@ const AuditionDetailPage: React.FC = () => {
           {/* 제목 + 필터 가로 정렬 */}
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">오디션 지원자 리스트</h2>
-
-            <div className="flex space-x-4">
-              <label className="flex items-center space-x-1">
-                <input
-                  type="radio"
-                  name="filter"
-                  value="all"
-                  checked={filter === "all"}
-                  onChange={() => {
-                    setFilter("all");
-                    setCurrentPage(1); // ❗ 필터 변경 시 1페이지 초기화
-                  }}
-                />
-                <span>모두</span>
-              </label>
-              <label className="flex items-center space-x-1">
-                <input
-                  type="radio"
-                  name="filter"
-                  value="scrap"
-                  checked={filter === "scrap"}
-                  onChange={() => {
-                    setFilter("scrap");
-                    setCurrentPage(1);
-                  }}
-                />
-                <span>북마크만 보기</span>
-              </label>
-              <label className="flex items-center space-x-1">
-                <input
-                  type="radio"
-                  name="filter"
-                  value="like"
-                  checked={filter === "like"}
-                  onChange={() => {
-                    setFilter("like");
-                    setCurrentPage(1);
-                  }}
-                />
-                <span>좋아요만 보기</span>
-              </label>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => router.push(`/audition/${id}/edit`)}
+                className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors"
+              >
+                오디션 수정하기
+              </button>
+              <div className="flex space-x-4">
+                <label className="flex items-center space-x-1">
+                  <input
+                    type="radio"
+                    name="filter"
+                    value="all"
+                    checked={filter === "all"}
+                    onChange={() => {
+                      setFilter("all");
+                      setCurrentPage(1); // ❗ 필터 변경 시 1페이지 초기화
+                    }}
+                  />
+                  <span>모두</span>
+                </label>
+                <label className="flex items-center space-x-1">
+                  <input
+                    type="radio"
+                    name="filter"
+                    value="scrap"
+                    checked={filter === "scrap"}
+                    onChange={() => {
+                      setFilter("scrap");
+                      setCurrentPage(1);
+                    }}
+                  />
+                  <span>북마크만 보기</span>
+                </label>
+                <label className="flex items-center space-x-1">
+                  <input
+                    type="radio"
+                    name="filter"
+                    value="like"
+                    checked={filter === "like"}
+                    onChange={() => {
+                      setFilter("like");
+                      setCurrentPage(1);
+                    }}
+                  />
+                  <span>좋아요만 보기</span>
+                </label>
+              </div>
             </div>
           </div>
 

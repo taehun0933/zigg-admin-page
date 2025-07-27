@@ -3,10 +3,11 @@
 // pages/DashboardPage.tsx
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Navigation, { NavItem } from "@/components/NavigationBar";
+import Navigation from "@/components/NavigationBar";
 import Header from "@/components/Header";
 import DashboardCard from "@/components/DashboardCard"; // DashboardCard 임포트
 import { useAuth } from "@/contexts/AuthContext";
+import { navigationItems } from "@/utils/navigation";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -26,21 +27,8 @@ export default function DashboardPage() {
     router.push("/signin");
   };
 
-  // Navigation에 전달할 항목 배열 (절대경로 사용)
-  const navItems: NavItem[] = [
-    {
-      label: "오디션 관리",
-      onClick: () => router.push("/audition"),
-    },
-    {
-      label: "공지사항 관리",
-      onClick: () => router.push("/announcement"),
-    },
-    {
-      label: "로그아웃",
-      onClick: handleLogout,
-    },
-  ];
+  // Navigation에 전달할 항목 배열 (공통 유틸리티 사용)
+  const navItems = navigationItems(router, handleLogout);
 
   if (isLoading) {
     return null; // 로딩 중이거나 로그인되지 않은 경우 아무것도 표시하지 않음
@@ -65,6 +53,11 @@ export default function DashboardPage() {
           title="공지사항"
           description="ZIGG의 공지사항을 작성해 보세요. 현재는 작업 중인 기능입니다."
           onClick={() => router.push("/announcement")}
+        />
+        <DashboardCard
+          title="게시판 관리"
+          description="게시판의 카테고리별 최상단 공지를 작성해보세요."
+          onClick={() => router.push("/board")}
         />
       </main>
     </div>

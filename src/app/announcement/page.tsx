@@ -3,8 +3,9 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import Navigation, { NavItem } from "@/components/NavigationBar";
+import Navigation from "@/components/NavigationBar";
 import Header from "@/components/Header";
+import { navigationItems } from "@/utils/navigation";
 
 const Announcement: React.FC = () => {
   const router = useRouter();
@@ -24,20 +25,7 @@ const Announcement: React.FC = () => {
     router.push("/signin");
   };
 
-  const navItems: NavItem[] = [
-    {
-      label: "오디션 관리",
-      onClick: () => router.push("/audition"),
-    },
-    {
-      label: "공지사항 관리",
-      onClick: () => router.push("/announcement"),
-    },
-    {
-      label: "로그아웃",
-      onClick: handleLogout,
-    },
-  ];
+  const navItems = navigationItems(router, handleLogout);
 
   if (isLoading) {
     return null;

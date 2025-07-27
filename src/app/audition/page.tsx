@@ -2,12 +2,13 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Navigation, { NavItem } from "@/components/NavigationBar";
+import Navigation from "@/components/NavigationBar";
 import AuditionCard from "@/components/AuditionCard";
 import { useAuth } from "@/contexts/AuthContext";
 import Modal from "@/components/Modal";
 import { getAuditions, postNewAudition } from "@/apis/audition";
 import { getUrlForUploadImage, putImageToPresignedUrl } from "@/apis/media";
+import { navigationItems } from "@/utils/navigation";
 
 export interface Audition {
   id: number;
@@ -173,11 +174,7 @@ const AuditionPage: React.FC = () => {
     router.push("/signin");
   };
 
-  const navItems: NavItem[] = [
-    { label: "오디션 관리", onClick: () => router.push("/audition") },
-    { label: "공지사항 관리", onClick: () => router.push("/announcement") },
-    { label: "로그아웃", onClick: handleLogout },
-  ];
+  const navItems = navigationItems(router, handleLogout);
 
   if (isLoading) {
     return (

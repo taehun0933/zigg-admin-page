@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Navigation from "@/components/NavigationBar";
 import { navigationItems } from "@/utils/navigation";
+import { AdminBoardPost, getAdminPosts } from "@/apis/board";
 
 interface BoardPost {
   id: number;
@@ -16,67 +17,54 @@ interface BoardPost {
   category: string;
 }
 
+// 상단에 매핑 추가
+const activeTabClasses: Record<string, string> = {
+  free: "text-blue-600 border-blue-600",
+  promotion: "text-green-600 border-green-600",
+  challenge: "text-purple-600 border-purple-600",
+};
+
+// 교체 후
+const formatYmdHm = (iso: string) => {
+  const parts = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+
+  const get = (t: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === t)?.value ?? "";
+
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
+};
+
 const Board: React.FC = () => {
   const router = useRouter();
   const { setIsLoggedIn, isLoggedIn } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("free");
-  const [posts, setPosts] = useState<BoardPost[]>([
-    {
-      id: 1,
-      title: "자유로운 소통 공간입니다",
-      content: "자유롭게 의견을 나누고 정보를 공유해보세요.",
-      author: "관리자",
-      createdAt: "2024-01-15",
-      views: 42,
-      category: "free"
-    },
-    {
-      id: 2,
-      title: "오늘 날씨가 정말 좋네요",
-      content: "오늘 날씨가 정말 좋아서 기분이 좋습니다.",
-      author: "사용자1",
-      createdAt: "2024-01-14",
-      views: 28,
-      category: "free"
-    },
-    {
-      id: 3,
-      title: "새로운 서비스 홍보합니다",
-      content: "혁신적인 서비스를 소개합니다. 많은 관심 부탁드립니다.",
-      author: "기업A",
-      createdAt: "2024-01-13",
-      views: 65,
-      category: "promotion"
-    },
-    {
-      id: 4,
-      title: "개발자 구인합니다",
-      content: "프론트엔드 개발자를 구인합니다. 연락처로 문의해주세요.",
-      author: "스타트업B",
-      createdAt: "2024-01-12",
-      views: 89,
-      category: "promotion"
-    },
-    {
-      id: 5,
-      title: "30일 코딩 첼린지",
-      content: "30일 동안 매일 코딩하는 첼린지에 참여해보세요!",
-      author: "개발팀",
-      createdAt: "2024-01-11",
-      views: 156,
-      category: "challenge"
-    },
-    {
-      id: 6,
-      title: "독서 첼린지",
-      content: "한 달에 한 권씩 책을 읽는 첼린지입니다.",
-      author: "독서모임",
-      createdAt: "2024-01-10",
-      views: 89,
-      category: "challenge"
+  const [posts, setPosts] = useState<AdminBoardPost[]>([]);
+
+  const boardIdMap: Record<string, number> = {
+    free: 1,
+    promotion: 2,
+    challenge: 3,
+  };
+
+  const fetchPosts = async (category: string) => {
+    try {
+      const boardId = boardIdMap[category];
+      const data = await getAdminPosts(boardId);
+      setPosts(data);
+    } catch (e) {
+      console.error("게시글 불러오기 실패:", e);
     }
-  ]);
+  };
+
 
   const categories = [
     { id: "free", name: "자유", color: "bg-blue-500" },
@@ -84,13 +72,20 @@ const Board: React.FC = () => {
     { id: "challenge", name: "첼린지", color: "bg-purple-500" }
   ];
 
+// 로그인 체크 전용
   useEffect(() => {
     if (!isLoggedIn) {
       router.replace("/signin");
-    } else {
-      setIsLoading(false);
     }
   }, [isLoggedIn, router]);
+
+    // 게시글 불러오기 전용
+  useEffect(() => {
+    if (isLoggedIn) {
+      setIsLoading(true);
+      fetchPosts(activeTab).finally(() => setIsLoading(false));
+    }
+  }, [isLoggedIn, activeTab]); // 👈 activeTab 변화만 감지
 
   const handleLogout = () => {
     setIsLoggedIn(false);
@@ -99,12 +94,12 @@ const Board: React.FC = () => {
 
   const handleDeletePost = (id: number) => {
     if (confirm("정말로 이 글을 삭제하시겠습니까?")) {
-      setPosts(posts.filter(post => post.id !== id));
+      setPosts(posts.filter(post => post.postId !== id));
       alert("글이 삭제되었습니다.");
     }
   };
 
-  const filteredPosts = posts.filter(post => post.category === activeTab);
+  const filteredPosts = posts.filter(post => post.boardId === boardIdMap[activeTab]);
 
   const navItems = navigationItems(router, handleLogout);
 
@@ -123,33 +118,41 @@ const Board: React.FC = () => {
               <h1 className="text-3xl font-bold text-gray-800">게시판 관리</h1>
               <p className="text-gray-600 mt-2">카테고리별 게시글 관리</p>
             </div>
-            <button
-              onClick={() => router.push(`/board/write?category=${activeTab}`)}
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold"
-            >
-              글 쓰기
-            </button>
+              <button
+                onClick={() =>
+                  router.push(`/board/write?category=${activeTab}&boardId=${boardIdMap[activeTab]}`)
+                }
+                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold"
+              >
+                글 쓰기
+              </button>
           </div>
           
           {/* 탭 네비게이션 */}
           <div className="border-b border-gray-200 mb-6">
-            <nav className="-mb-px flex space-x-8">
-              {categories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setActiveTab(category.id)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === category.id
-                      ? `border-${category.color.replace('bg-', '')} text-${category.color.replace('bg-', '')}`
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  {category.name}
-                </button>
-              ))}
+            <nav className="-mb-px flex space-x-8" role="tablist" aria-label="게시판 카테고리">
+              {categories.map((category) => {
+                const isActive = activeTab === category.id;
+                return (
+                  <button
+                    key={category.id}
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => setActiveTab(category.id)}
+                    className={[
+                      "py-2 px-1 text-sm font-medium border-b-2 transition-colors",
+                      isActive
+                        ? activeTabClasses[category.id] // 활성 색상(파란/초록/보라)
+                        : "text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300",
+                    ].join(" ")}
+                  >
+                    {category.name}
+                  </button>
+                );
+              })}
             </nav>
           </div>
-          
+                    
           {/* 글 목록 */}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -168,37 +171,33 @@ const Board: React.FC = () => {
                     작성일
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    조회수
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     관리
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredPosts.map((post) => (
-                  <tr key={post.id} className="hover:bg-gray-50">
+                  <tr key={post.postId} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {post.id}
+                      {post.postId}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {post.title}
+                      {post.postTitle}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {post.author}
+                      {post.postCreator.userName}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {post.createdAt}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {post.views}
+                      {formatYmdHm(post.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
-                        onClick={() => handleDeletePost(post.id)}
+                        onClick={() =>
+                          router.push(`/board/edit?boardId=${post.boardId}&postId=${post.postId}`)
+                        }
                         className="text-red-600 hover:text-red-900"
                       >
-                        삭제
+                        수정 및 삭제
                       </button>
                     </td>
                   </tr>

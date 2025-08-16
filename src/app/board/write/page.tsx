@@ -6,6 +6,23 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Navigation from "@/components/NavigationBar";
 import { navigationItems } from "@/utils/navigation";
+import {
+  toImageExt,        // (지금은 컴포넌트에서 직접은 안써도 됨)
+  uploadImageForPost,// (옵션/미사용)
+  getImageSize,      // (requestImagePresignedUrl 내부에서 사용)
+  putFileToPresignedUrl,
+  requestImagePresignedUrl,
+  requestVideoPresignedUrl,  // ✅ 추가
+  toVideoExt,                // ✅ 추가
+  formatHms,                 // ✅ 추가
+  createPost,                // ✅ 추가
+} from "@/apis/board"; // 경로 확인: 실제 파일 위치와 통일
+
+const boardIdMap: Record<string, number> = {
+  free: 1,
+  promotion: 2,
+  challenge: 3,
+};
 
 const BoardWrite: React.FC = () => {
   const router = useRouter();
@@ -16,15 +33,23 @@ const BoardWrite: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [category, setCategory] = useState("free");
 
+  // state 추가
+  const [boardId, setBoardId] = useState<number | null>(null);
+
   const [files, setFiles] = useState<File[]>([]);
   const [previewURLs, setPreviewURLs] = useState<string[]>([]);
 
+  // 초기 쿼리 파싱 useEffect 수정
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const categoryParam = urlParams.get('category');
-    if (categoryParam) {
-      setCategory(categoryParam);
-    }
+    const categoryParam = urlParams.get("category") || "free";
+    setCategory(categoryParam);
+
+    // 1) 쿼리에 boardId가 오면 그걸 사용, 2) 없으면 매핑으로 계산
+    const fromQuery = urlParams.get("boardId");
+    const resolved =
+      fromQuery !== null ? Number(fromQuery) : boardIdMap[categoryParam] ?? 1;
+    setBoardId(resolved);
   }, []);
 
   useEffect(() => {
@@ -59,27 +84,77 @@ const BoardWrite: React.FC = () => {
     };
 
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !content.trim()) {
-      alert("제목과 내용을 모두 입력해주세요.");
-      return;
-    }
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!title.trim() || !content.trim()) {
+        alert("제목과 내용을 모두 입력해주세요.");
+        return;
+      }
+    
+      setIsSubmitting(true);
+      try {
+        const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+        const videoFiles = files.filter((f) => f.type.startsWith("video/"));
+    
+        // 1) 이미지: presigned URL 발급 → PUT 업로드 → url 수집
+        const imageUrls: string[] = [];
+        for (const img of imageFiles) {
+          const { url } = await requestImagePresignedUrl(img);
+          await putFileToPresignedUrl(url, img);
+          imageUrls.push(url); // 최종 게시글 본문에 그대로 사용(요구사항대로)
+        }
+    
+        // 2) 비디오: presigned URL 발급 → PUT 업로드
+        let videoUrl: string | undefined;
+        let videoDuration: string | undefined;
+        if (videoFiles[0]) {
+          const v = videoFiles[0];
+    
+          // 길이(초) 계산
+          const durationSec = await new Promise<number>((resolve, reject) => {
+            const u = URL.createObjectURL(v);
+            const el = document.createElement("video");
+            el.preload = "metadata";
+            el.onloadedmetadata = () => {
+              resolve(Math.floor(el.duration || 0));
+              URL.revokeObjectURL(u);
+            };
+            el.onerror = () => reject(new Error("비디오 길이 추출 실패"));
+            el.src = u;
+          });
+    
+          const { url } = await requestVideoPresignedUrl(durationSec, toVideoExt(v));
+          await putFileToPresignedUrl(url, v);
+          videoUrl = url;
+          videoDuration = formatHms(durationSec); // "HH:mm:ss"
+        }
+    
+        // handleSubmit 내부 createPost 호출 부분 교체
+        if (!boardId) {
+          alert("게시판 정보를 확인할 수 없습니다.");
+          setIsSubmitting(false);
+          return;
+        }
 
-    setIsSubmitting(true);
-    try {
-      // TODO: 파일 포함하여 API 호출
-      console.log("글 저장:", { title, content, category, files });
-
-      alert("글이 성공적으로 저장되었습니다!");
-      router.push("/board");
-    } catch (error) {
-      console.error("글 저장 실패:", error);
-      alert("글 저장에 실패했습니다.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+        await createPost(boardId, {
+          postTitle: title,
+          postMessage: content,
+          postImageContent: imageUrls,
+          postVideoThumbnail: imageUrls[0],
+          postVideoContent: videoUrl
+            ? { videoKey: videoUrl, videoDuration: videoDuration! }
+            : undefined,
+        });
+    
+        alert("글이 성공적으로 저장되었습니다!");
+        router.push("/board");
+      } catch (err: any) {
+        console.error(err);
+        alert(err?.message || "업로드 중 오류가 발생했습니다.");
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
 
 
 

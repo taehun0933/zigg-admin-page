@@ -1,6 +1,8 @@
 // lib/api/board.ts
 import apiClient from "@/utils/apiClient";
 import { handleApiError } from "@/utils/apiError";
+import { formatHms, getFileExtension, getImageDimensions } from "@/utils/media";
+import {ImageRequestType, VideoRequestType} from "@/types/media"
 
 /* ====== 타입 ====== */
 export interface AdminBoardPost {
@@ -53,7 +55,6 @@ export type CreatePostBody = {
   };
 };
 
-type VideoExtension = "MP4" | "MOV" | "WEBM";
 
 /* ====== 조회 API ====== */
 export const getAdminPosts = async (boardId: number): Promise<AdminBoardPost[]> => {
@@ -82,33 +83,13 @@ export const getAdminPostDetail = async (
   }
 };
 
-/* ====== 이미지 presigned 발급 + 유틸 ====== */
-export function toImageExt(file: File): "JPG" | "PNG" | "WEBP" | "GIF" {
-  if (file.type.includes("png")) return "PNG";
-  if (file.type.includes("webp")) return "WEBP";
-  if (file.type.includes("gif")) return "GIF";
-  return "JPG";
-}
-
-export function getImageSize(file: File): Promise<{ width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      resolve({ width: img.naturalWidth, height: img.naturalHeight });
-      URL.revokeObjectURL(url);
-    };
-    img.onerror = () => reject(new Error("이미지 크기 읽기 실패"));
-    img.src = url;
-  });
-}
 
 export async function requestImagePresignedUrl(
   file: File
 ): Promise<{ contentId: number; url: string }> {
   try {
-    const { width, height } = await getImageSize(file);
-    const body = { extension: toImageExt(file), width, height };
+    const { width, height } = await getImageDimensions(file);
+    const body = { extension: getFileExtension(file), width, height };
     const res = await apiClient.post(`/contents/image`, body, {
       params: { purpose: "POST_IMAGE" },
     });
@@ -134,27 +115,14 @@ export async function uploadImageForPost(
   }
 }
 
-/* ====== 비디오 presigned 발급 + 유틸 ====== */
-export function toVideoExt(file: File): VideoExtension {
-  if (file.type.includes("mp4")) return "MP4";
-  if (file.type.includes("quicktime")) return "MOV";
-  return "WEBM";
-}
 
-export function formatHms(totalSec: number) {
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(h)}:${pad(m)}:${pad(s)}`;
-}
+
 
 export async function requestVideoPresignedUrl(
-  durationSec: number,
-  extension: VideoExtension
+  req: VideoRequestType
 ): Promise<{ contentId: number; url: string }> {
   try {
-    const body = { videoDuration: String(durationSec), videoExtension: extension };
+    const body = { videoDuration: req.videoDuration, videoExtension: req.videoExtension };
     const res = await apiClient.post(`/contents/video`, body, {
       params: { purpose: "POST_VIDEO" },
     });

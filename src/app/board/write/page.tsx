@@ -6,17 +6,16 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Navigation from "@/components/NavigationBar";
 import { navigationItems } from "@/utils/navigation";
+import { useMemo } from "react";
+
 import {
-  toImageExt,        // (지금은 컴포넌트에서 직접은 안써도 됨)
-  uploadImageForPost,// (옵션/미사용)
-  getImageSize,      // (requestImagePresignedUrl 내부에서 사용)
   putFileToPresignedUrl,
   requestImagePresignedUrl,
-  requestVideoPresignedUrl,  // ✅ 추가
-  toVideoExt,                // ✅ 추가
-  formatHms,                 // ✅ 추가
-  createPost,                // ✅ 추가
-} from "@/apis/board"; // 경로 확인: 실제 파일 위치와 통일
+  requestVideoPresignedUrl,
+  createPost,
+} from "@/apis/board";
+
+import { getVideoDurationSec, getFileExtension, formatHms } from "@/utils/media";
 
 const boardIdMap: Record<string, number> = {
   free: 1,
@@ -32,6 +31,7 @@ const BoardWrite: React.FC = () => {
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [category, setCategory] = useState("free");
+
 
   // state 추가
   const [boardId, setBoardId] = useState<number | null>(null);
@@ -65,23 +65,46 @@ const BoardWrite: React.FC = () => {
     router.push("/signin");
   };
 
-  const MAX_FILES = 5;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = Array.from(e.target.files || []);
-
-    const newFiles = [...files, ...selectedFiles];
-
-    if (newFiles.length > MAX_FILES) {
-        alert(`사진/영상은 최대 ${MAX_FILES}개까지 업로드할 수 있습니다.`);
-        return;
-    }
-
-    setFiles(newFiles);
-
-    const newPreviewURLs = selectedFiles.map((file) => URL.createObjectURL(file));
-    setPreviewURLs((prev) => [...prev, ...newPreviewURLs]);
+  // ✅ files → previews 파생
+  const previews = useMemo(() => {
+    return files.map((f) => ({
+      url: URL.createObjectURL(f),
+      isVideo: f.type.startsWith("video/"),
+    }));
+  }, [files]);
+  
+  // ✅ 이번 렌더에서 만든 URL만 정리 (다음 렌더 전에 실행)
+  useEffect(() => {
+    return () => {
+      previews.forEach((p) => URL.revokeObjectURL(p.url));
     };
+  }, [previews]);
+  
+  const MAX_FILES = 5;
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const incoming = Array.from(e.target.files || []);
+    const remaining = Math.max(0, MAX_FILES - files.length);
+    const take = incoming.slice(0, remaining);
+  
+    if (incoming.length > remaining) {
+      alert(`사진/영상은 최대 ${MAX_FILES}개까지 업로드할 수 있습니다.`);
+    }
+  
+    setFiles((prev) => [...prev, ...take]);
+  
+    // 같은 파일을 연속으로 선택해도 onChange가 다시 트리거되게
+    e.target.value = "";
+  };
+  
+  // 미리보기 URL 메모리 해제
+  useEffect(() => {
+    return () => {
+      previewURLs.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [previewURLs]);
+  
 
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -109,24 +132,21 @@ const BoardWrite: React.FC = () => {
         let videoDuration: string | undefined;
         if (videoFiles[0]) {
           const v = videoFiles[0];
-    
+        
           // 길이(초) 계산
-          const durationSec = await new Promise<number>((resolve, reject) => {
-            const u = URL.createObjectURL(v);
-            const el = document.createElement("video");
-            el.preload = "metadata";
-            el.onloadedmetadata = () => {
-              resolve(Math.floor(el.duration || 0));
-              URL.revokeObjectURL(u);
-            };
-            el.onerror = () => reject(new Error("비디오 길이 추출 실패"));
-            el.src = u;
-          });
-    
-          const { url } = await requestVideoPresignedUrl(durationSec, toVideoExt(v));
+          const sec = await getVideoDurationSec(v);
+        
+          // 확장자 대문자
+          const ext = getFileExtension(v);
+        
+          // presigned 발급 + 업로드
+          const { url } = await requestVideoPresignedUrl({videoDuration: String(sec), videoExtension: ext});
+          console.log(url);
+
           await putFileToPresignedUrl(url, v);
+        
           videoUrl = url;
-          videoDuration = formatHms(durationSec); // "HH:mm:ss"
+          videoDuration = formatHms(sec); // "HH:mm:ss"
         }
     
         // handleSubmit 내부 createPost 호출 부분 교체
@@ -227,21 +247,18 @@ const BoardWrite: React.FC = () => {
 
             {/* 선택된 파일 미리보기 */}
             <div className="mt-4 grid grid-cols-3 gap-4">
-                {previewURLs.map((url, idx) => {
-                const file = files[idx];
-                const isVideo = file?.type.startsWith("video");
-
-                return isVideo ? (
-                    <div key={idx} className="relative w-full h-32 overflow-hidden rounded-md border border-gray-200">
-                    <video src={url} controls className="w-full h-full object-cover" />
+                {previews.map((p, idx) =>
+                  p.isVideo ? (
+                    <div key={p.url} className="relative w-full h-32 overflow-hidden rounded-md border border-gray-200">
+                      <video src={p.url} controls className="w-full h-full object-cover" />
                     </div>
-                ) : (
-                    <div key={idx} className="relative w-full h-32 overflow-hidden rounded-md border border-gray-200">
-                    <img src={url} alt={`uploaded-${idx}`} className="w-full h-full object-cover" />
+                  ) : (
+                    <div key={p.url} className="relative w-full h-32 overflow-hidden rounded-md border border-gray-200">
+                      <img src={p.url} alt={`uploaded-${idx}`} className="w-full h-full object-cover" />
                     </div>
-                );
-                })}
-            </div>
+                  )
+                )}
+              </div>
             </div>
 
             {/* 버튼 */}

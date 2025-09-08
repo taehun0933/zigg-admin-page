@@ -1,5 +1,7 @@
+import { VideoRequestType } from "@/types/media";
 import apiClient from "@/utils/apiClient";
 import { handleApiError } from "@/utils/apiError";
+import { getImageDimensions, getFileExtension } from "@/utils/media";
 
 export type ImageUploadPurposeType =
   | "HISTORY_THUMBNAIL"
@@ -18,7 +20,11 @@ export type ImageUploadPurposeType =
   | "APPLICATION_VIDEO"
   | "APPLICATION_IMAGE"
   | "AUDITION_IMAGE"
-  | "AUDITION_VIDEO";
+  | "AUDITION_VIDEO"
+  | "NOTICE_BANNER"
+  | "NOTICE_IMAGE"
+  | "NOTICE_VIDEO";
+
 
 interface UploadUrlResponse {
   contentId: number;
@@ -77,3 +83,43 @@ export const putImageToPresignedUrl = async ({
     return false;
   }
 };
+
+export async function requestImagePresignedUrl(
+  file: File, contentPurpose: String
+): Promise<{ contentId: number; url: string }> {
+  try {
+    const { width, height } = await getImageDimensions(file);
+    const body = { extension: getFileExtension(file), width, height };
+    const res = await apiClient.post(`/contents/image`, body, {
+      params: { purpose: contentPurpose },
+    });
+    return res.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+export async function requestVideoPresignedUrl(
+  req: VideoRequestType, contentPurpose: String
+): Promise<{ videoContentId: number; url: string }> {
+  try {
+    const body = { videoDuration: req.videoDuration, videoExtension: req.videoExtension };
+    const res = await apiClient.post(`/contents/video`, body, {
+      params: { purpose: contentPurpose },
+    });
+    return res.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+
+/* ====== presigned PUT 공용 ====== */
+export async function putFileToPresignedUrl(url: string, file: File): Promise<void> {
+  const r = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  });
+  if (!r.ok) throw new Error(`프리사인드 업로드 실패: ${r.status}`);
+}

@@ -101,7 +101,7 @@ export async function requestImagePresignedUrl(
 
 export async function requestVideoPresignedUrl(
   req: VideoRequestType, contentPurpose: String
-): Promise<{ videoContentId: number; url: string }> {
+): Promise<{ contentId: number; url: string }> {
   try {
     const body = { videoDuration: req.videoDuration, videoExtension: req.videoExtension };
     const res = await apiClient.post(`/contents/video`, body, {

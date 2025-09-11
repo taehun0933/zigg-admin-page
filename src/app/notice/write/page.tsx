@@ -311,6 +311,7 @@ export default function NoticeCreatePage() {
 
           const imageFiles = files.filter((f) => f.type.startsWith("image/"));
           const videoFiles = files.filter((f) => f.type.startsWith("video/"));
+          console.log(imageFiles,videoFiles);
           
           // 1) 이미지: presigned URL 발급 → PUT 업로드 → url 수집
           const imageUrls: string[] = [];
@@ -320,6 +321,7 @@ export default function NoticeCreatePage() {
             const { url, contentId } = await requestImagePresignedUrl(img, "NOTICE_IMAGE");
             await putFileToPresignedUrl(url, img);
             imageUrls.push(url); // 최종 게시글 본문에 그대로 사용(요구사항대로)
+            imageIds.push(contentId);
           }
           
           // 2) 비디오: presigned URL 발급 → PUT 업로드
@@ -335,8 +337,8 @@ export default function NoticeCreatePage() {
             const ext = getFileExtension(v);
           
             // presigned 발급 + 업로드
-            const { url, videoContentId } = await requestVideoPresignedUrl({videoDuration: String(sec), videoExtension: ext}, "NOTICE_VIDEO");
-            noticeVideoContentId = videoContentId
+            const { url, contentId } = await requestVideoPresignedUrl({videoDuration: String(sec), videoExtension: ext}, "NOTICE_VIDEO");
+            noticeVideoContentId = contentId
             console.log(url);
             await putFileToPresignedUrl(url, v)
           

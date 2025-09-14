@@ -5,10 +5,7 @@ import { useRouter } from "next/navigation";
 import Navigation from "@/components/NavigationBar";
 import { navigationItems } from "@/utils/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  getAdminNoticeBanners,
-  AdminNoticeBanner,
-} from "@/apis/notice";
+import { getAdminNoticeBanners, AdminNoticeBanner } from "@/apis/notice";
 
 export default function AdminNoticeGridPage() {
   const router = useRouter();
@@ -18,7 +15,9 @@ export default function AdminNoticeGridPage() {
   const [banners, setBanners] = useState<AdminNoticeBanner[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const navItems = navigationItems(router, () => {
     setIsLoggedIn(false);
     router.push("/signin");
@@ -36,16 +35,18 @@ export default function AdminNoticeGridPage() {
     let mountedFlag = true;
     setIsLoading(true);
     setError(null);
-  
+
     getAdminNoticeBanners()
       .then((list) => mountedFlag && setBanners(list ?? []))
       .catch((e) => {
         console.error(e);
-        mountedFlag && setError("공지 배너를 불러오지 못했어요.");
+        if (mountedFlag) setError("공지 배너를 불러오지 못했어요.");
       })
       .finally(() => mountedFlag && setIsLoading(false));
-  
-    return () => { mountedFlag = false; };
+
+    return () => {
+      mountedFlag = false;
+    };
   }, [mounted, isLoggedIn]);
 
   const handleCardClick = (item: AdminNoticeBanner) => {
@@ -104,42 +105,42 @@ export default function AdminNoticeGridPage() {
           )}
 
           {/* 그리드 */}
-{!isLoading && !error && banners.length > 0 && (
-  <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-    {banners.map((item) => (
-      <li
-        key={item.noticeId}
-        className="group rounded-xl overflow-hidden border border-gray-100 shadow cursor-pointer bg-white"
-        onClick={() => handleCardClick(item)}
-        role="button"
-        aria-label={`공지 ${item.noticeId} 열기`}
-      >
-        <div className="aspect-[16/9] overflow-hidden">
-          <img
-            src={item.bannerImage.imageKey}   // ✅ Audition과 동일: imageKey 그대로 사용
-            alt={`notice-${item.noticeId}`}
-            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform"
-            loading="lazy"
-          />
-        </div>
-        <div className="p-3 flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-800">
-            #{item.noticeId}
-          </span>
-          <span
-            className={
-              item.bannerImage.onClickUrl
-                ? "text-xs text-blue-600 underline"
-                : "text-xs text-gray-400"
-            }
-          >
-            {item.bannerImage.onClickUrl ? "외부 링크" : "상세 보기"}
-          </span>
-        </div>
-      </li>
-    ))}
-  </ul>
-)}
+          {!isLoading && !error && banners.length > 0 && (
+            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {banners.map((item) => (
+                <li
+                  key={item.noticeId}
+                  className="group rounded-xl overflow-hidden border border-gray-100 shadow cursor-pointer bg-white"
+                  onClick={() => handleCardClick(item)}
+                  role="button"
+                  aria-label={`공지 ${item.noticeId} 열기`}
+                >
+                  <div className="aspect-[16/9] overflow-hidden">
+                    <img
+                      src={item.bannerImage.imageKey} // ✅ Audition과 동일: imageKey 그대로 사용
+                      alt={`notice-${item.noticeId}`}
+                      className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div className="p-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-800">
+                      #{item.noticeId}
+                    </span>
+                    <span
+                      className={
+                        item.bannerImage.onClickUrl
+                          ? "text-xs text-blue-600 underline"
+                          : "text-xs text-gray-400"
+                      }
+                    >
+                      {item.bannerImage.onClickUrl ? "외부 링크" : "상세 보기"}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </main>
     </div>

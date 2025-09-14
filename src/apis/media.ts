@@ -25,7 +25,6 @@ export type ImageUploadPurposeType =
   | "NOTICE_IMAGE"
   | "NOTICE_VIDEO";
 
-
 interface UploadUrlResponse {
   contentId: number;
   url: string;
@@ -85,7 +84,8 @@ export const putImageToPresignedUrl = async ({
 };
 
 export async function requestImagePresignedUrl(
-  file: File, contentPurpose: String
+  file: File,
+  contentPurpose: string
 ): Promise<{ contentId: number; url: string }> {
   try {
     const { width, height } = await getImageDimensions(file);
@@ -100,10 +100,14 @@ export async function requestImagePresignedUrl(
 }
 
 export async function requestVideoPresignedUrl(
-  req: VideoRequestType, contentPurpose: String
+  req: VideoRequestType,
+  contentPurpose: string
 ): Promise<{ contentId: number; url: string }> {
   try {
-    const body = { videoDuration: req.videoDuration, videoExtension: req.videoExtension };
+    const body = {
+      videoDuration: req.videoDuration,
+      videoExtension: req.videoExtension,
+    };
     const res = await apiClient.post(`/contents/video`, body, {
       params: { purpose: contentPurpose },
     });
@@ -113,9 +117,11 @@ export async function requestVideoPresignedUrl(
   }
 }
 
-
 /* ====== presigned PUT 공용 ====== */
-export async function putFileToPresignedUrl(url: string, file: File): Promise<void> {
+export async function putFileToPresignedUrl(
+  url: string,
+  file: File
+): Promise<void> {
   const r = await fetch(url, {
     method: "PUT",
     headers: { "Content-Type": file.type || "application/octet-stream" },

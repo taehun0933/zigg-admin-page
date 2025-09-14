@@ -51,7 +51,7 @@ export default function DashboardPage() {
         />
         <DashboardCard
           title="공지사항"
-          description="ZIGG의 공지사항을 작성해 보세요. 현재는 작업 중인 기능입니다."
+          description="ZIGG의 공지사항을 작성해 보세요."
           onClick={() => router.push("/notice")}
         />
         <DashboardCard

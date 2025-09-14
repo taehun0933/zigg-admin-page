@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Navigation from "@/components/NavigationBar";
 import { navigationItems } from "@/utils/navigation";
 import { AdminBoardPost, getAdminPosts } from "@/apis/board";
@@ -39,7 +39,9 @@ const formatYmdHm = (iso: string) => {
   const get = (t: Intl.DateTimeFormatPartTypes) =>
     parts.find((p) => p.type === t)?.value ?? "";
 
-  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get(
+    "minute"
+  )}`;
 };
 
 const Board: React.FC = () => {
@@ -49,43 +51,48 @@ const Board: React.FC = () => {
   const [activeTab, setActiveTab] = useState("free");
   const [posts, setPosts] = useState<AdminBoardPost[]>([]);
 
-  const boardIdMap: Record<string, number> = {
-    free: 1,
-    promotion: 2,
-    challenge: 3,
-  };
+  const boardIdMap: Record<string, number> = useMemo(
+    () => ({
+      free: 1,
+      promotion: 2,
+      challenge: 3,
+    }),
+    []
+  );
 
-  const fetchPosts = async (category: string) => {
-    try {
-      const boardId = boardIdMap[category];
-      const data = await getAdminPosts(boardId);
-      setPosts(data);
-    } catch (e) {
-      console.error("게시글 불러오기 실패:", e);
-    }
-  };
-
+  const fetchPosts = useCallback(
+    async (category: string) => {
+      try {
+        const boardId = boardIdMap[category];
+        const data = await getAdminPosts(boardId);
+        setPosts(data);
+      } catch (e) {
+        console.error("게시글 불러오기 실패:", e);
+      }
+    },
+    [boardIdMap]
+  );
 
   const categories = [
     { id: "free", name: "자유", color: "bg-blue-500" },
     { id: "promotion", name: "홍보/구인", color: "bg-green-500" },
-    { id: "challenge", name: "첼린지", color: "bg-purple-500" }
+    { id: "challenge", name: "첼린지", color: "bg-purple-500" },
   ];
 
-// 로그인 체크 전용
+  // 로그인 체크 전용
   useEffect(() => {
     if (!isLoggedIn) {
       router.replace("/signin");
     }
   }, [isLoggedIn, router]);
 
-    // 게시글 불러오기 전용
+  // 게시글 불러오기 전용
   useEffect(() => {
     if (isLoggedIn) {
       setIsLoading(true);
       fetchPosts(activeTab).finally(() => setIsLoading(false));
     }
-  }, [isLoggedIn, activeTab]); // 👈 activeTab 변화만 감지
+  }, [isLoggedIn, activeTab, fetchPosts]); // 👈 fetchPosts 추가
 
   const handleLogout = () => {
     setIsLoggedIn(false);
@@ -94,12 +101,14 @@ const Board: React.FC = () => {
 
   const handleDeletePost = (id: number) => {
     if (confirm("정말로 이 글을 삭제하시겠습니까?")) {
-      setPosts(posts.filter(post => post.postId !== id));
+      setPosts(posts.filter((post) => post.postId !== id));
       alert("글이 삭제되었습니다.");
     }
   };
 
-  const filteredPosts = posts.filter(post => post.boardId === boardIdMap[activeTab]);
+  const filteredPosts = posts.filter(
+    (post) => post.boardId === boardIdMap[activeTab]
+  );
 
   const navItems = navigationItems(router, handleLogout);
 
@@ -118,19 +127,25 @@ const Board: React.FC = () => {
               <h1 className="text-3xl font-bold text-gray-800">게시판 관리</h1>
               <p className="text-gray-600 mt-2">카테고리별 게시글 관리</p>
             </div>
-              <button
-                onClick={() =>
-                  router.push(`/board/write?category=${activeTab}&boardId=${boardIdMap[activeTab]}`)
-                }
-                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold"
-              >
-                글 쓰기
-              </button>
+            <button
+              onClick={() =>
+                router.push(
+                  `/board/write?category=${activeTab}&boardId=${boardIdMap[activeTab]}`
+                )
+              }
+              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold"
+            >
+              글 쓰기
+            </button>
           </div>
-          
+
           {/* 탭 네비게이션 */}
           <div className="border-b border-gray-200 mb-6">
-            <nav className="-mb-px flex space-x-8" role="tablist" aria-label="게시판 카테고리">
+            <nav
+              className="-mb-px flex space-x-8"
+              role="tablist"
+              aria-label="게시판 카테고리"
+            >
               {categories.map((category) => {
                 const isActive = activeTab === category.id;
                 return (
@@ -152,7 +167,7 @@ const Board: React.FC = () => {
               })}
             </nav>
           </div>
-                    
+
           {/* 글 목록 */}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -193,7 +208,9 @@ const Board: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
                         onClick={() =>
-                          router.push(`/board/edit?boardId=${post.boardId}&postId=${post.postId}`)
+                          router.push(
+                            `/board/edit?boardId=${post.boardId}&postId=${post.postId}`
+                          )
                         }
                         className="text-red-600 hover:text-red-900"
                       >
@@ -205,7 +222,7 @@ const Board: React.FC = () => {
               </tbody>
             </table>
           </div>
-          
+
           {filteredPosts.length === 0 && (
             <div className="text-center py-8">
               <p className="text-gray-500">등록된 게시글이 없습니다.</p>
@@ -217,4 +234,4 @@ const Board: React.FC = () => {
   );
 };
 
-export default Board; 
+export default Board;

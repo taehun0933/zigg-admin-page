@@ -132,7 +132,10 @@ const ApplicantDetailModalContent: React.FC<
                 key={i}
                 className="w-full aspect-video bg-gray-200 rounded overflow-hidden"
               >
-                <video controls className="w-full h-full object-cover">
+                <video
+                  controls
+                  className="w-full h-full object-contain bg-black"
+                >
                   <source src={video.videoUrl} />
                   동영상을 지원하지 않는 브라우저입니다.
                 </video>

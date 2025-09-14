@@ -66,7 +66,7 @@ const AuditionDetailPage: React.FC = () => {
 
   const navItems: NavItem[] = [
     { label: "오디션 관리", onClick: () => router.push("/audition") },
-    { label: "공지사항 관리", onClick: () => router.push("/announcement") },
+    { label: "공지사항 관리", onClick: () => router.push("/notice") },
     { label: "로그아웃", onClick: handleLogout },
   ];
 

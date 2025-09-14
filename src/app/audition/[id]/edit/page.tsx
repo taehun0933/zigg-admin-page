@@ -24,7 +24,7 @@ const AuditionEditPage: React.FC = () => {
   // 헤더용 navItems
   const navItems: NavItem[] = [
     { label: "오디션 관리", onClick: () => router.push("/audition") },
-    { label: "공지사항 관리", onClick: () => router.push("/announcement") },
+    { label: "공지사항 관리", onClick: () => router.push("/notice") },
     { label: "로그아웃", onClick: () => router.push("/signin") },
   ];
 
@@ -32,7 +32,6 @@ const AuditionEditPage: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-
         const token = localStorage.getItem("token"); // 토큰 위치에 따라 수정
         const res = await fetch(`${BASE_URL}/auditions/${id}`, {
           headers: {
@@ -63,7 +62,7 @@ const AuditionEditPage: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setForm((prev) => prev ? { ...prev, [name]: value } : prev);
+    setForm((prev) => (prev ? { ...prev, [name]: value } : prev));
   };
 
   return (
@@ -171,4 +170,4 @@ const AuditionEditPage: React.FC = () => {
   );
 };
 
-export default AuditionEditPage; 
+export default AuditionEditPage;

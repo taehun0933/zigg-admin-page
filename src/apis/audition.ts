@@ -1,6 +1,7 @@
 import { AuditionInfoType } from "@/types/audition";
 import apiClient from "@/utils/apiClient";
 import { handleApiError } from "@/utils/apiError";
+import { AuditionDetailType } from "@/types/audition";
 
 export const getAuditions = async () => {
   try {
@@ -119,3 +120,23 @@ export const deleteLikeApplicant = async (body: {
     throw handleApiError(error);
   }
 };
+
+// 단일 상세
+export const getAuditionDetail = async (auditionId: number): Promise<AuditionDetailType> => {
+  try {
+    const res = await apiClient.get<AuditionDetailType>(`/auditions/${auditionId}`);
+    return res.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+
+export const deleteAudition = async (auditionId: number): Promise<AuditionDetailType> => {
+  try {
+    const res = await apiClient.delete<AuditionDetailType>(`/auditions/${auditionId}`);
+    return res.data;
+  } catch(error){
+    throw handleApiError(error);
+  }
+}

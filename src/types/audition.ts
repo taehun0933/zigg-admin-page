@@ -49,3 +49,19 @@ export interface AuditionInfoType {
   numberOfElements: number;
   empty: boolean;
 }
+
+export interface AuditionDetailType {
+  id: number;
+  title: string;
+  company: string;
+  qualification: string;
+  startDate: string;   // "YYYY-MM-DD"
+  endDate: string;     // "YYYY-MM-DD"
+  thumbnail?: {
+    imageKey: string;        // https://...png
+    onClickUrl: string | null;
+  };
+  likeCount: number;
+  scrapCount: number;
+  applicationCount: number;
+}

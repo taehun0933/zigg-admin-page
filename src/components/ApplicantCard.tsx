@@ -13,6 +13,8 @@ import {
   IoBookmarkOutline,
   IoHeart,
   IoHeartOutline,
+  IoCloseCircle,
+  IoCheckmarkCircle
 } from "react-icons/io5";
 
 interface ApplicantCardProps {
@@ -40,6 +42,7 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({
     id,
     userId,
     videos,
+    acceptFeedback
   } = auditionProfile;
 
   const [isLiked, setIsLiked] = useState(auditionProfile.isLiked);
@@ -109,7 +112,24 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({
       >
         {isLiked ? <IoHeart size={20} /> : <IoHeartOutline size={20} />}
       </div>
-
+      {/* ✅ 피드백 배지 (우상단 아이콘들과 겹치지 않도록 상단 중앙) */}
+      <div
+        className="absolute top-0.5 left-1/2 -translate-x-1/2"
+        onClick={(e) => e.stopPropagation()}
+        title={acceptFeedback ? "피드백 수락" : "피드백 미수락"}
+      >
+        {acceptFeedback ? (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-full bg-emerald-100 text-emerald-700">
+            <IoCheckmarkCircle size={14} />
+            피드백 OK
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-full bg-gray-100 text-gray-500">
+            <IoCloseCircle size={14} />
+            피드백 X
+          </span>
+        )}
+      </div>
       {/* 프로필 이미지 */}
       <div className="w-40 h-40 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden mb-4">
         <img

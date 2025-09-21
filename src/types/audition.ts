@@ -19,6 +19,7 @@ export interface AuditionProfileType {
   userId: number;
   auditionId: number;
   createdAt: string; // ISO string
+  acceptFeedback: boolean;
 }
 
 export interface AuditionInfoType {

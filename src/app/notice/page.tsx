@@ -54,7 +54,7 @@ export default function AdminNoticeGridPage() {
     if (url) {
       window.open(url, "_blank", "noopener,noreferrer");
     } else {
-      router.push(`/notices/${item.noticeId}`); // 내부 상세로 이동
+      router.push(`/notice/edit/${item.noticeId}`); // 내부 상세로 이동
     }
   };
 

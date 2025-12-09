@@ -141,7 +141,6 @@ const BoardWrite: React.FC = () => {
         
           // presigned 발급 + 업로드
           const { url } = await requestVideoPresignedUrl({videoDuration: String(sec), videoExtension: ext});
-          console.log(url);
 
           await putFileToPresignedUrl(url, v);
         

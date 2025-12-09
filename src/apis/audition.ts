@@ -29,7 +29,7 @@ export const postNewAudition = async (body: {
   }
 };
 
-export type AuditionFilterType = "all" | "scrap" | "like";
+export type AuditionFilterType = "all" | "scrap" | "like" | "acceptFeedback";
 
 export const getAuditionInfo = async (body: {
   auditionId: number;
@@ -46,6 +46,8 @@ export const getAuditionInfo = async (body: {
       params.scrap = true;
     } else if (body.filter === "like") {
       params.like = true;
+    } else if (body.filter === "acceptFeedback") {
+      params.acceptFeedback = true;
     }
 
     const response = await apiClient.get<AuditionInfoType>(

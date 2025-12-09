@@ -27,7 +27,7 @@ const AuditionDetailPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
-  const [filter, setFilter] = useState<"all" | "scrap" | "like">("all");
+  const [filter, setFilter] = useState<"all" | "scrap" | "like" | "acceptFeedback">("all");
 
   const getAuditionInfoData = useCallback(async () => {
     try {
@@ -145,6 +145,19 @@ const AuditionDetailPage: React.FC = () => {
                     }}
                   />
                   <span>좋아요만 보기</span>
+                </label>
+                <label className="flex items-center space-x-1">
+                  <input
+                    type="radio"
+                    name="filter"
+                    value="acceptFeedback"
+                    checked={filter === "acceptFeedback"}
+                    onChange={() => {
+                      setFilter("acceptFeedback");
+                      setCurrentPage(1);
+                    }}
+                  />
+                  <span>피드백 수락만 보기</span>
                 </label>
               </div>
             </div>

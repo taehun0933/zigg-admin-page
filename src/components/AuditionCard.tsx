@@ -9,8 +9,6 @@ interface AuditionCardProps {
 const AuditionCard: React.FC<AuditionCardProps> = ({ audition }) => {
   const router = useRouter();
 
-  console.log(audition);
-
   return (
     <button
       className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer text-left"

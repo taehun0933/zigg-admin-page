@@ -316,7 +316,6 @@ export default function NoticeCreatePage() {
       } else if (layout === "COMMON") {
         const imageFiles = files.filter((f) => f.type.startsWith("image/"));
         const videoFiles = files.filter((f) => f.type.startsWith("video/"));
-        console.log(imageFiles, videoFiles);
 
         // 1) 이미지: presigned URL 발급 → PUT 업로드 → url 수집
         const imageUrls: string[] = [];
@@ -350,7 +349,6 @@ export default function NoticeCreatePage() {
             "NOTICE_VIDEO"
           );
           noticeVideoContentId = contentId;
-          console.log(url);
           await putFileToPresignedUrl(url, v);
 
           videoUrl = url;

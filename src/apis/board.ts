@@ -99,23 +99,6 @@ export async function requestImagePresignedUrl(
   }
 }
 
-/** (옵션) 예전 멀티파트 방식 – 지금 플로우에서는 미사용 */
-export async function uploadImageForPost(
-  file: File
-): Promise<{ contentId: number; url: string }> {
-  try {
-    const fd = new FormData();
-    fd.append("imageFile", file); // 서버 필드명에 맞추세요
-    const res = await apiClient.post(`/contents/image`, fd, {
-      params: { purpose: "POST_IMAGE" },
-    });
-    return res.data;
-  } catch (error) {
-    throw handleApiError(error);
-  }
-}
-
-
 
 
 export async function requestVideoPresignedUrl(

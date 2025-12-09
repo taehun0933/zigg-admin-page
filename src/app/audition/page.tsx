@@ -155,7 +155,7 @@ const AuditionPage: React.FC = () => {
     const now = new Date();
 
     const sorted = [...auditions].sort(
-      (a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
+      (a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
     );
 
     const ongoing = sorted.filter(

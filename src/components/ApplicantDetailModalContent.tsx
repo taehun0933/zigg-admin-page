@@ -1,18 +1,89 @@
 "use client";
 
+import { getAuditionFeedbacks, sendApplicationFeedback } from "@/apis/feedback";
 import { AuditionProfileType } from "@/types/audition";
-import React, { useState } from "react";
+import { AuditionFeedback } from "@/types/feedback";
+import React, { useMemo, useState, useEffect } from "react";
 
 interface ApplicantDetailModalContentProps {
   applicantInfo: AuditionProfileType | null;
 }
 
-const ApplicantDetailModalContent: React.FC<
-  ApplicantDetailModalContentProps
-> = ({ applicantInfo }) => {
+const ApplicantDetailModalContent: React.FC<ApplicantDetailModalContentProps> = ({
+  applicantInfo
+}) => {
+  
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendSuccess, setSendSuccess] = useState<string | null>(null);
+
+  const [textReviews, setTextReviews] = useState<string[]>([]);
+  const [isLoadingFeedbacks, setIsLoadingFeedbacks] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const canSend = useMemo(() => feedbackText.trim().length > 0 && !isSending, [feedbackText, isSending]);
+
+  useEffect(() => {
+  if (!applicantInfo) return;
+  refreshFeedbacks();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [applicantInfo?.id]);
+
 
   if (!applicantInfo) return null;
+  const handleSendFeedback = async () => {
+    if (!canSend) return;
+
+    try {
+      setIsSending(true);
+      setSendError(null);
+      setSendSuccess(null);
+
+      const status = await sendApplicationFeedback({
+        auditionId: applicantInfo.auditionId,
+        applicationId: applicantInfo.id,
+        textReview: feedbackText.trim(),
+      });
+
+      // 보통 201/200
+      if (status >= 200 && status < 300) {
+        setSendSuccess("피드백을 전송했어요.");
+        setFeedbackText("");
+
+        await refreshFeedbacks();
+      } else {
+        setSendError("피드백 전송에 실패했어요. 다시 시도해 주세요.");
+      }
+    } catch (e: any) {
+      setSendError(e?.message ?? "피드백 전송 중 오류가 발생했어요.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const refreshFeedbacks = async () => {
+  if (!applicantInfo) return;
+
+  try {
+    setIsLoadingFeedbacks(true);
+    setLoadError(null);
+
+    const data = await getAuditionFeedbacks(applicantInfo.auditionId, applicantInfo.id);
+    // data: AuditionFeedback[] (배열)
+
+    const list = (data ?? [])
+      .map((fb) => fb?.textReview?.trim())
+      .filter((v): v is string => !!v && v.length > 0);
+
+    setTextReviews(list);
+  } catch (e: any) {
+    setLoadError(e?.message ?? "피드백 목록을 불러오지 못했어요.");
+  } finally {
+    setIsLoadingFeedbacks(false);
+  }
+};
+
 
   return (
     <div className="p-6 space-y-8">
@@ -145,6 +216,46 @@ const ApplicantDetailModalContent: React.FC<
         ) : (
           <p className="text-gray-500 text-sm">등록된 비디오가 없습니다.</p>
         )}
+        
+          {/* ✅ 여기부터: 피드백 작성/전송 UI (비디오 아래) */}
+          <div className="mt-8 bg-gray-100 p-6 rounded-lg">
+          <h4 className="text-lg font-semibold mb-3">피드백 보내기</h4>
+
+          <textarea
+            value={feedbackText}
+            onChange={(e) => setFeedbackText(e.target.value)}
+            placeholder="지원자에게 전달할 피드백을 입력해 주세요."
+            className="w-full h-32 p-3 border border-gray-300 rounded resize-y bg-white"
+          />
+
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={handleSendFeedback}
+              disabled={!canSend}
+              className={`px-4 py-2 rounded text-white ${
+                canSend ? "bg-black hover:bg-black/90" : "bg-gray-400 cursor-not-allowed"
+              }`}
+            >
+              {isSending ? "전송 중..." : "피드백 전송"}
+            </button>
+          </div>
+          {!isLoadingFeedbacks && textReviews.length === 0 && !loadError && (
+            <p className="mt-4 text-sm text-gray-500">아직 피드백이 없어요.</p>
+          )}
+
+          {textReviews.length > 0 && (
+            <ul className="mt-4 space-y-3">
+              {textReviews.map((text, idx) => (
+                <li key={idx} className="border border-gray-200 rounded-lg p-4">
+                  <p className="text-sm whitespace-pre-wrap break-words">{text}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {sendError && <p className="mt-3 text-sm text-red-600">{sendError}</p>}
+          {sendSuccess && <p className="mt-3 text-sm text-green-600">{sendSuccess}</p>}
+        </div>   
       </div>
     </div>
   );

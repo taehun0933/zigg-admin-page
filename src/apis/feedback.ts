@@ -32,3 +32,31 @@ export const getAuditionFeedbacks = async (
     throw handleApiError(error);
   }
 };
+
+export const deleteAuditionFeedback = async (
+  auditionId: number,
+  applicationId: number,
+  feedbackId: number
+) => {
+  const res = await apiClient.delete(
+    `/auditions/${auditionId}/applications/${applicationId}/feedbacks/${feedbackId}`
+  );
+  return res.status;
+}
+
+export const updateAuditionFeedback = async (body: {
+  auditionId: number;
+  applicationId: number;
+  feedbackId: number;
+  textReview: string;
+}) => {
+  try {
+    const res = await apiClient.patch(
+      `/auditions/${body.auditionId}/applications/${body.applicationId}/feedbacks/${body.feedbackId}`,
+      { textReview: body.textReview }
+    );
+    return res.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};

@@ -1,6 +1,11 @@
 "use client";
 
-import { getAuditionFeedbacks, sendApplicationFeedback } from "@/apis/feedback";
+import { 
+  getAuditionFeedbacks, 
+  sendApplicationFeedback,
+  deleteAuditionFeedback,
+  updateAuditionFeedback
+} from "@/apis/feedback";
 import { AuditionProfileType } from "@/types/audition";
 import { AuditionFeedback } from "@/types/feedback";
 import React, { useMemo, useState, useEffect } from "react";
@@ -19,10 +24,14 @@ const ApplicantDetailModalContent: React.FC<ApplicantDetailModalContentProps> = 
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
 
-  const [textReviews, setTextReviews] = useState<string[]>([]);
+  const [feedbacks, setFeedbacks] = useState<AuditionFeedback[]>([]);
   const [isLoadingFeedbacks, setIsLoadingFeedbacks] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const canSend = useMemo(() => feedbackText.trim().length > 0 && !isSending, [feedbackText, isSending]);
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [isMutating, setIsMutating] = useState(false); // 수정/삭제 진행중 잠금
 
   useEffect(() => {
   if (!applicantInfo) return;
@@ -33,54 +42,127 @@ const ApplicantDetailModalContent: React.FC<ApplicantDetailModalContentProps> = 
 
   if (!applicantInfo) return null;
   const handleSendFeedback = async () => {
-    if (!canSend) return;
+  if (!canSend) return;
+
+  // ✅ 전송 확인(OK/Cancel)
+  const ok = window.confirm(
+    "유저에게 피드백을 보내시겠습니까?\n유저의 기기에 알림이 전송됩니다."
+  );
+  if (!ok) return;
+
+  try {
+    setIsSending(true);
+    setSendError(null);
+    setSendSuccess(null);
+
+    const status = await sendApplicationFeedback({
+      auditionId: applicantInfo.auditionId,
+      applicationId: applicantInfo.id,
+      textReview: feedbackText.trim(),
+    });
+
+    if (status >= 200 && status < 300) {
+      setSendSuccess("피드백을 전송했어요.");
+      setFeedbackText("");
+      await refreshFeedbacks();
+    } else {
+      setSendError("피드백 전송에 실패했어요. 다시 시도해 주세요.");
+    }
+  } catch (e: any) {
+    setSendError(e?.message ?? "피드백 전송 중 오류가 발생했어요.");
+  } finally {
+    setIsSending(false);
+  }
+};
+
+  const refreshFeedbacks = async () => {
+    if (!applicantInfo) return;
 
     try {
-      setIsSending(true);
-      setSendError(null);
-      setSendSuccess(null);
+      setIsLoadingFeedbacks(true);
+      setLoadError(null);
 
-      const status = await sendApplicationFeedback({
-        auditionId: applicantInfo.auditionId,
-        applicationId: applicantInfo.id,
-        textReview: feedbackText.trim(),
-      });
-
-      // 보통 201/200
-      if (status >= 200 && status < 300) {
-        setSendSuccess("피드백을 전송했어요.");
-        setFeedbackText("");
-
-        await refreshFeedbacks();
-      } else {
-        setSendError("피드백 전송에 실패했어요. 다시 시도해 주세요.");
-      }
+      const data = await getAuditionFeedbacks(applicantInfo.auditionId, applicantInfo.id);
+      setFeedbacks(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      setSendError(e?.message ?? "피드백 전송 중 오류가 발생했어요.");
+      setLoadError(e?.message ?? "피드백 목록을 불러오지 못했어요.");
     } finally {
-      setIsSending(false);
+      setIsLoadingFeedbacks(false);
     }
   };
 
-  const refreshFeedbacks = async () => {
-  if (!applicantInfo) return;
+  const onClickEdit = (fb: AuditionFeedback) => {
+  // ✅ 편집 시작
+  setEditingId((fb as any).id);                  // <- 타입에 맞게 fb.id로 바꿔도 됨
+  setEditingText((fb as any).textReview ?? "");  // <- 타입에 맞게
+};
+
+const onCancelEdit = () => {
+  setEditingId(null);
+  setEditingText("");
+};
+
+const onSaveEdit = async (fb: AuditionFeedback) => {
+  const ok = window.confirm("이 피드백을 수정하시겠습니까?");
+  if (!ok || !applicantInfo) return;
+
+  const feedbackId = (fb as any).id as number; // 가능하면 fb.id로 바꾸기
+  const nextText = editingText.trim();
+  if (!feedbackId || nextText.length === 0) return;
 
   try {
-    setIsLoadingFeedbacks(true);
-    setLoadError(null);
+    setIsMutating(true);
+    setSendError(null);
+    setSendSuccess(null);
 
-    const data = await getAuditionFeedbacks(applicantInfo.auditionId, applicantInfo.id);
-    // data: AuditionFeedback[] (배열)
+    const updated = await updateAuditionFeedback({
+      auditionId: applicantInfo.auditionId,
+      applicationId: applicantInfo.id,
+      feedbackId,
+      textReview: nextText,
+    });
 
-    const list = (data ?? [])
-      .map((fb) => fb?.textReview?.trim())
-      .filter((v): v is string => !!v && v.length > 0);
+    // ✅ (옵션1) 서버 응답으로 로컬 state 즉시 반영
+    setFeedbacks((prev) =>
+      prev.map((x) => ((x as any).id === feedbackId ? updated : x))
+    );
 
-    setTextReviews(list);
+    // ✅ (옵션2) 그냥 항상 최신을 다시 땡기고 싶으면 이것만 쓰면 됨
+    // await refreshFeedbacks();
+
+    setEditingId(null);
+    setEditingText("");
+    setSendSuccess("피드백을 수정했어요.");
   } catch (e: any) {
-    setLoadError(e?.message ?? "피드백 목록을 불러오지 못했어요.");
+    setSendError(e?.message ?? "피드백 수정 중 오류가 발생했어요.");
   } finally {
-    setIsLoadingFeedbacks(false);
+    setIsMutating(false);
+  }
+};
+  const onDeleteFeedback = async (fb: AuditionFeedback) => {
+  const ok = window.confirm("이 피드백을 삭제하시겠습니까?");
+  if (!ok || !applicantInfo) return;
+
+  try {
+    setIsMutating(true);
+    setSendError(null);
+
+    const feedbackId = (fb as any).id as number; // 타입 맞으면 fb.id로 교체
+    const status = await deleteAuditionFeedback(
+      applicantInfo.auditionId,
+      applicantInfo.id,
+      feedbackId
+    );
+
+    if (status >= 200 && status < 300) {
+      await refreshFeedbacks();
+    } else {
+      setSendError("피드백 삭제에 실패했어요. 다시 시도해 주세요.");
+    }
+  } catch (e: any) {
+    setSendError(e?.message ?? "피드백 삭제 중 오류가 발생했어요.");
+  } finally {
+    setIsMutating(false);
   }
 };
 
@@ -240,19 +322,113 @@ const ApplicantDetailModalContent: React.FC<ApplicantDetailModalContentProps> = 
               {isSending ? "전송 중..." : "피드백 전송"}
             </button>
           </div>
-          {!isLoadingFeedbacks && textReviews.length === 0 && !loadError && (
+          {!isLoadingFeedbacks && feedbacks.length === 0 && !loadError && (
             <p className="mt-4 text-sm text-gray-500">아직 피드백이 없어요.</p>
           )}
 
-          {textReviews.length > 0 && (
-            <ul className="mt-4 space-y-3">
-              {textReviews.map((text, idx) => (
-                <li key={idx} className="border border-gray-200 rounded-lg p-4">
-                  <p className="text-sm whitespace-pre-wrap break-words">{text}</p>
-                </li>
-              ))}
-            </ul>
-          )}
+          
+{feedbacks.length > 0 && (
+  <ul className="mt-4 space-y-3">
+    {feedbacks.map((fb, idx) => {
+      const id = (fb as any).id as number;                 // <- fb.id로 바꾸면 더 좋음
+      const text = ((fb as any).textReview ?? "") as string;
+
+      const isEditing = editingId === id;
+
+      return (
+        <li key={id ?? idx} className="border border-gray-200 rounded-lg p-4 bg-white">
+          <div className="flex items-start justify-between gap-3">
+            {/* 본문 / 수정 textarea */}
+            <div className="flex-1 min-w-0">
+              {!isEditing ? (
+                <p className="text-sm whitespace-pre-wrap break-words">{text}</p>
+              ) : (
+                <textarea
+                  value={editingText}
+                  onChange={(e) => setEditingText(e.target.value)}
+                  className="w-full min-h-[96px] p-2 border border-gray-300 rounded resize-y bg-white text-sm"
+                />
+              )}
+            </div>
+
+            {/* 우측 버튼들 */}
+              <div className="flex items-center gap-2 shrink-0">
+                {!isEditing ? (
+                  <>
+                    {/* 수정(연필) */}
+                    <button
+                      type="button"
+                      onClick={() => onClickEdit(fb)}
+                      disabled={isMutating}
+                      className="inline-flex items-center justify-center
+                                    h-9 w-9 rounded-md
+                                    bg-gray-100 text-gray-700
+                                    hover:bg-gray-200
+                                    disabled:opacity-50
+                                    border border-gray-200"
+                      aria-label="수정"
+                      title="수정"
+                    >
+                      ✏️
+                    </button>
+
+                    {/* 삭제(휴지통) */}
+                    <button
+                      type="button"
+                      onClick={() => onDeleteFeedback(fb)}
+                      disabled={isMutating}
+                      className="    inline-flex items-center justify-center
+                                      h-9 w-9 rounded-md
+                                      bg-gray-100 text-gray-600
+                                      hover:bg-red-50 hover:text-red-600
+                                      disabled:opacity-50
+                                      border border-gray-200"
+                      aria-label="삭제"
+                      title="삭제"
+                    >
+                      🗑️
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {/* 저장 */}
+                    <button
+                      type="button"
+                      onClick={() => onSaveEdit(fb)}
+                      disabled={isMutating || editingText.trim().length === 0}
+                      className="    inline-flex items-center justify-center
+                                      h-9 w-9 rounded-md
+                                      bg-gray-100 text-gray-700
+                                      hover:bg-gray-200
+                                      disabled:opacity-50
+                                      border border-gray-200"
+                      aria-label="저장"
+                      title="저장"
+                    >
+                      ✅
+                    </button>
+
+                    {/* 취소 */}
+                    <button
+                      type="button"
+                      onClick={onCancelEdit}
+                      disabled={isMutating}
+                      className="inline-flex items-center justify-center h-9 w-9 rounded-md
+                                bg-gray-200 text-gray-800 hover:bg-gray-300 disabled:opacity-50"
+                      aria-label="취소"
+                      title="취소"
+                    >
+                      ✖️
+                    </button>
+                  </>
+                )}
+              </div>
+          </div>
+        </li>
+      );
+    })}
+  </ul>
+)}
           {sendError && <p className="mt-3 text-sm text-red-600">{sendError}</p>}
           {sendSuccess && <p className="mt-3 text-sm text-green-600">{sendSuccess}</p>}
         </div>   

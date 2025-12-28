@@ -301,6 +301,8 @@ export default function NoticeCreatePage() {
           bannerImageFile,
           "NOTICE_BANNER"
         );
+
+
         await putFileToPresignedUrl(url, bannerImageFile);
         bannerUrl = url;
         bannerContentId = contentId;

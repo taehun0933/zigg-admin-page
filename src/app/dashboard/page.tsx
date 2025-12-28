@@ -59,6 +59,11 @@ export default function DashboardPage() {
           description="게시판의 카테고리별 최상단 공지를 작성해보세요."
           onClick={() => router.push("/board")}
         />
+        <DashboardCard
+          title="고객 목소리함"
+          description="고객의 소중한 의견을 확인하고 관리해 보세요."
+          onClick={() => router.push("/user-feedback")}
+        />
       </main>
     </div>
   );

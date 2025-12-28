@@ -11,6 +11,7 @@ import {
     getAdminNoticeDetail,
     updateAdminNotice,  
     type NoticeLayout,
+    deleteAdminNotice
   } from "@/apis/notice";
 import { requestImagePresignedUrl, requestVideoPresignedUrl } from "@/apis/media";
 import { putFileToPresignedUrl } from "@/apis/board";
@@ -206,63 +207,77 @@ const onPickBanner: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
 
   // 저장 공통
 // 저장 공통
-const onSave = async () => {
-    try {
-      
-      const basePayload: any = {
-        priority,
-        // 사용자가 배너를 바꾸지 않았다면 undefined로 두어 서버가 기존 값 유지
-        bannerImageContent: bannerContentId,
-      };
-  
-      if (layout === "BANNER_ONLY") {
-        await updateAdminNotice(id, {
-          ...basePayload,
-          layout: "BANNER_ONLY",
-        });
-      } else if (layout === "COMMON") {
-        // (기존 이미지/비디오 업로드 로직은 그대로)
-        const imageIds: string[] = [];
-        let noticeVideoContent: any = undefined;
-  
-        const imageFiles = files.filter((f) => f.type.startsWith("image/"));
-        const video = files.find((f) => f.type.startsWith("video/"));
-  
-        for (const img of imageFiles) {
-          const { url, contentId } = await requestImagePresignedUrl(img, "NOTICE_IMAGE");
-          await putFileToPresignedUrl(url, img);
-          imageIds.push(String(contentId));
+  const onSave = async () => {
+      try {
+        
+        const basePayload: any = {
+          priority,
+          // 사용자가 배너를 바꾸지 않았다면 undefined로 두어 서버가 기존 값 유지
+          bannerImageContent: bannerContentId,
+        };
+    
+        if (layout === "BANNER_ONLY") {
+          await updateAdminNotice(id, {
+            ...basePayload,
+            layout: "BANNER_ONLY",
+          });
+        } else if (layout === "COMMON") {
+          // (기존 이미지/비디오 업로드 로직은 그대로)
+          const imageIds: string[] = [];
+          let noticeVideoContent: any = undefined;
+    
+          const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+          const video = files.find((f) => f.type.startsWith("video/"));
+    
+          for (const img of imageFiles) {
+            const { url, contentId } = await requestImagePresignedUrl(img, "NOTICE_IMAGE");
+            await putFileToPresignedUrl(url, img);
+            imageIds.push(String(contentId));
+          }
+    
+          if (video) {
+            const sec = await getVideoDurationSec(video);
+            const ext = getFileExtension(video);
+            const { url, contentId } = await requestVideoPresignedUrl(
+              { videoDuration: String(sec), videoExtension: ext },
+              "NOTICE_VIDEO"
+            );
+            await putFileToPresignedUrl(url, video);
+            noticeVideoContent = { videoKey: String(contentId), videoDuration: String(sec) };
+          }
+    
+          await updateAdminNotice(id, {
+            ...basePayload,
+            layout: "COMMON",
+            title,
+            textContent,
+            noticeImageContent: imageIds.length ? imageIds : undefined,
+            noticeVideoContent,
+          });
         }
-  
-        if (video) {
-          const sec = await getVideoDurationSec(video);
-          const ext = getFileExtension(video);
-          const { url, contentId } = await requestVideoPresignedUrl(
-            { videoDuration: String(sec), videoExtension: ext },
-            "NOTICE_VIDEO"
-          );
-          await putFileToPresignedUrl(url, video);
-          noticeVideoContent = { videoKey: String(contentId), videoDuration: String(sec) };
-        }
-  
-        await updateAdminNotice(id, {
-          ...basePayload,
-          layout: "COMMON",
-          title,
-          textContent,
-          noticeImageContent: imageIds.length ? imageIds : undefined,
-          noticeVideoContent,
-        });
+    
+        alert("저장되었습니다.");
+        router.push("/notice");
+      } catch (err: any) {
+        console.error(err);
+        alert(err?.message ?? "저장 중 오류가 발생했습니다.");
       }
-  
-      alert("저장되었습니다.");
-      router.push("/notice");
-    } catch (err: any) {
-      console.error(err);
-      alert(err?.message ?? "저장 중 오류가 발생했습니다.");
-    }
+    };
+
+  const onDelete = async () => {
+  const ok = window.confirm("정말로 이 공지를 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.");
+  if (!ok) return;
+
+  try {
+    await deleteAdminNotice(id);
+    alert("삭제되었습니다.");
+    router.push("/notice");
+  } catch (err: any) {
+    console.error(err);
+    alert(err?.message ?? "삭제 중 오류가 발생했습니다.");
+  }
   };
-  
+
 
   if (!mounted || !isLoggedIn || isLoading || !layout) {
     return <div className="min-h-screen bg-gray-50" />;
@@ -361,11 +376,27 @@ const onSave = async () => {
           )}
 
           <div className="flex gap-3 pt-2">
-            <button onClick={onSave} className="px-6 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700">
+            <button
+              onClick={onSave}
+              className="px-6 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
+            >
               저장
             </button>
-            <button onClick={() => router.push("/notice")} className="px-6 py-2 rounded-md bg-gray-500 text-white hover:bg-gray-600">
+
+            <button
+              onClick={() => router.push("/notice")}
+              className="px-6 py-2 rounded-md bg-gray-500 text-white hover:bg-gray-600"
+            >
               취소
+            </button>
+
+            <div className="flex-1" />
+
+            <button
+              onClick={onDelete}
+              className="px-6 py-2 rounded-md bg-red-600 text-white hover:bg-red-700"
+            >
+              삭제
             </button>
           </div>
         </div>

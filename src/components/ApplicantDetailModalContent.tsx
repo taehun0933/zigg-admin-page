@@ -6,8 +6,7 @@ import {
   deleteAuditionFeedback,
   updateAuditionFeedback
 } from "@/apis/feedback";
-import { AuditionProfileType } from "@/types/audition";
-import { AuditionFeedback } from "@/types/feedback";
+import { AuditionProfileType, AuditionFeedback } from "@/types/audition";
 import React, { useMemo, useState, useEffect } from "react";
 
 interface ApplicantDetailModalContentProps {

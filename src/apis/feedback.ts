@@ -1,4 +1,4 @@
-import { AuditionFeedbackList } from "@/types/feedback";
+import { AuditionFeedbackList } from "@/types/audition";
 import apiClient from "@/utils/apiClient";
 import { handleApiError } from "@/utils/apiError";
 

@@ -62,7 +62,7 @@ export default function DashboardPage() {
         <DashboardCard
           title="고객 목소리함"
           description="고객의 소중한 의견을 확인하고 관리해 보세요."
-          onClick={() => router.push("/user-feedback")}
+          onClick={() => router.push("/customerInquiry")}
         />
       </main>
     </div>

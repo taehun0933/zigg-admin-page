@@ -1,4 +1,6 @@
 import { MediaImageType, MediaVideoType } from "./media";
+import { User } from "@/types/user";
+import { PageResponse } from "@/types/common";
 
 export interface AuditionProfileType {
   id: number;
@@ -22,34 +24,8 @@ export interface AuditionProfileType {
   acceptFeedback: boolean;
 }
 
-export interface AuditionInfoType {
-  totalPages: number;
-  totalElements: number;
-  first: boolean;
-  last: boolean;
-  pageable: {
-    paged: boolean;
-    pageNumber: number;
-    pageSize: number;
-    offset: number;
-    sort: {
-      sorted: boolean;
-      empty: boolean;
-      unsorted: boolean;
-    };
-    unpaged: boolean;
-  };
-  size: number;
-  content: AuditionProfileType[];
-  number: number;
-  sort: {
-    sorted: boolean;
-    empty: boolean;
-    unsorted: boolean;
-  };
-  numberOfElements: number;
-  empty: boolean;
-}
+/** 오디션 프로필 목록 API 응답 (Spring Page) */
+export type AuditionInfoType = PageResponse<AuditionProfileType>;
 
 export interface AuditionDetailType {
   id: number;
@@ -66,3 +42,12 @@ export interface AuditionDetailType {
   scrapCount: number;
   applicationCount: number;
 }
+
+export interface AuditionFeedback {
+  id: number;
+  textReview: string;
+  reviewer: User;
+  application: AuditionProfileType; 
+}
+
+export type AuditionFeedbackList = AuditionFeedback[];

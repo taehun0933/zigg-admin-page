@@ -38,8 +38,11 @@ const AuditionDetailPage: React.FC = () => {
       });
       setCurrentAuditionInfo(data);
       setTotalPages(data.totalPages);
-    } catch (error) {
-      console.error(error);
+    } catch (error: unknown) {
+      const err = error as { message?: string; status?: number };
+      const msg = err?.message ?? (typeof error === "object" && error !== null ? JSON.stringify(error) : String(error));
+      console.error("[오디션 지원자 조회 실패]", msg, error);
+      alert(`데이터를 불러오지 못했습니다.\n${msg}`);
     }
   }, [id, currentPage, filter]);
 

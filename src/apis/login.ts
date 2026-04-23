@@ -1,12 +1,11 @@
 import { handleApiError } from "@/utils/apiError";
+import { getApiBaseUrl } from "@/utils/apiConfig";
 import axios from "axios";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL_FOR_ADMIN;
 
 export const authService = {
   register: async (email: string, password: string) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/register`, {
+      const response = await axios.post(`${getApiBaseUrl()}/register`, {
         email,
         password,
       });
@@ -18,7 +17,7 @@ export const authService = {
 
   login: async (email: string, password: string) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/login`, {
+      const response = await axios.post(`${getApiBaseUrl()}/login`, {
         email,
         password,
       });

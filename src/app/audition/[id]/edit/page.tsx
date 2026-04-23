@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Navigation, { NavItem } from "@/components/NavigationBar";
 import { getAuditionDetail, deleteAudition } from "@/apis/audition";
+import { getApiBaseUrl } from "@/utils/apiConfig";
 import { getUrlForUploadImage, putImageToPresignedUrl } from "@/apis/media";
 
 interface AuditionEditData {
@@ -27,8 +28,6 @@ const AuditionEditPage: React.FC = () => {
   const [imageMeta, setImageMeta] = useState<{ extension: string; width: number; height: number } | null>(null);
   const [currentImageKey, setCurrentImageKey] = useState<string>(""); // 조회 시 표시용
   const fileRef = useRef<HTMLInputElement | null>(null);
-
-  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL_FOR_ADMIN;
 
   const navItems: NavItem[] = [
     { label: "오디션 관리", onClick: () => router.push("/audition") },
@@ -133,7 +132,7 @@ const AuditionEditPage: React.FC = () => {
       };
       if (typeof thumbnailIdToSend === "number") payload.thumbnailId = thumbnailIdToSend;
 
-      const resp = await fetch(`${BASE_URL}/auditions/${id}`, {
+      const resp = await fetch(`${getApiBaseUrl()}/auditions/${id}`, {
         method: "PATCH",
         headers: { Authorization: `${token}`, "Content-Type": "application/json" },
         body: JSON.stringify(payload),

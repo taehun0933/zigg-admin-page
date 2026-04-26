@@ -64,6 +64,11 @@ export default function DashboardPage() {
           description="고객의 소중한 의견을 확인하고 관리해 보세요."
           onClick={() => router.push("/customerInquiry")}
         />
+        <DashboardCard
+          title="티켓 수동 지급"
+          description="결제 오류 발생 시 유저 닉네임으로 티켓을 직접 지급합니다."
+          onClick={() => router.push("/ticket")}
+        />
       </main>
     </div>
   );

@@ -18,6 +18,10 @@ export const navigationItems = (
     onClick: () => router.push("/board"),
   },
   {
+    label: "티켓 지급",
+    onClick: () => router.push("/ticket"),
+  },
+  {
     label: "로그아웃",
     onClick: handleLogout,
   },

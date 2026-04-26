@@ -28,13 +28,24 @@ const AuditionDetailPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   const [filter, setFilter] = useState<"all" | "scrap" | "like" | "acceptFeedback">("all");
+  const [searchInput, setSearchInput] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const getAuditionInfoData = useCallback(async () => {
     try {
       const data = await getAuditionInfo({
         auditionId: id,
-        pageNum: currentPage - 1, // 서버는 0-index니까
+        pageNum: currentPage - 1,
         filter,
+        name: debouncedSearch || undefined,
       });
       setCurrentAuditionInfo(data);
       setTotalPages(data.totalPages);
@@ -44,7 +55,7 @@ const AuditionDetailPage: React.FC = () => {
       console.error("[오디션 지원자 조회 실패]", msg, error);
       alert(`데이터를 불러오지 못했습니다.\n${msg}`);
     }
-  }, [id, currentPage, filter]);
+  }, [id, currentPage, filter, debouncedSearch]);
 
   const handlePageChange = (
     event: React.ChangeEvent<unknown>,
@@ -99,16 +110,25 @@ const AuditionDetailPage: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 pt-8 pb-8">
         <section className="mb-12">
-          {/* 제목 + 필터 가로 정렬 */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">오디션 지원자 리스트</h2>
-            <div className="flex items-center space-x-4">
+          {/* 제목 + 검색 + 필터 */}
+          <div className="flex flex-col gap-4 mb-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">오디션 지원자 리스트</h2>
               <button
                 onClick={() => router.push(`/audition/${id}/edit`)}
                 className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition-colors"
               >
                 오디션 수정하기
               </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="이름 또는 닉네임으로 검색"
+                className="w-64 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-black"
+              />
               <div className="flex space-x-4">
                 <label className="flex items-center space-x-1">
                   <input

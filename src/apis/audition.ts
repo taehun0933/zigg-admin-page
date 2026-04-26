@@ -35,19 +35,23 @@ export const getAuditionInfo = async (body: {
   auditionId: number;
   pageNum: number;
   filter: AuditionFilterType;
+  name?: string;
 }): Promise<AuditionInfoType> => {
   try {
     const params: Record<string, any> = {
       page: body.pageNum,
     };
 
-    // filter에 따라 scrap/like 추가
     if (body.filter === "scrap") {
       params.scrap = true;
     } else if (body.filter === "like") {
       params.like = true;
     } else if (body.filter === "acceptFeedback") {
       params.acceptFeedback = true;
+    }
+
+    if (body.name) {
+      params.name = body.name;
     }
 
     const response = await apiClient.get<AuditionInfoType>(

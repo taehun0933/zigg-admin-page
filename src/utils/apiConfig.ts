@@ -2,17 +2,16 @@
 // NEXT_PUBLIC_API_URL_DEV, NEXT_PUBLIC_API_URL_PROD가 둘 다 있어야 전환 가능
 
 const STORAGE_KEY = "admin_api_mode";
-const DEFAULT = process.env.NEXT_PUBLIC_BASE_URL_FOR_ADMIN ?? "";
-const DEV_URL = process.env.NEXT_PUBLIC_API_URL_DEV ?? DEFAULT;
-const PROD_URL = process.env.NEXT_PUBLIC_API_URL_PROD ?? DEFAULT;
+const DEV_URL = process.env.NEXT_PUBLIC_API_URL_DEV ?? "https://dev.achoom-zigg.com/admin/v0";
+const PROD_URL = process.env.NEXT_PUBLIC_API_URL_PROD ?? "https://prod.achoom-zigg.com/admin/v0";
 
 export type ApiMode = "dev" | "prod";
 
 export function getApiMode(): ApiMode {
-  if (typeof window === "undefined") return "prod";
+  if (typeof window === "undefined") return "dev";
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored === "dev" || stored === "prod") return stored;
-  return "prod";
+  return "dev";
 }
 
 export function setApiMode(mode: ApiMode): void {

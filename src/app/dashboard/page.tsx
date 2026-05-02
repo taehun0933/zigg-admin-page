@@ -6,13 +6,29 @@ import { useRouter } from "next/navigation";
 import Navigation from "@/components/NavigationBar";
 import Header from "@/components/Header";
 import DashboardCard from "@/components/DashboardCard"; // DashboardCard 임포트
+import StatsNationalityChart from "@/components/StatsNationalityChart";
+import StatsDailyUserChart from "@/components/StatsDailyUserChart";
+import StatsSummaryCards from "@/components/StatsSummaryCards";
 import { useAuth } from "@/contexts/AuthContext";
 import { navigationItems } from "@/utils/navigation";
+import {
+  fetchStatsOverview,
+  fetchStatsTimeseries,
+  PlatformStats,
+} from "@/apis/stats";
+
+const STATS_RANGE_DAYS = 90;
+
+function toIsoDate(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
 
 export default function DashboardPage() {
   const router = useRouter();
   const { setIsLoggedIn, isLoggedIn } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
+  const [overview, setOverview] = useState<PlatformStats | null>(null);
+  const [series, setSeries] = useState<PlatformStats[]>([]);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -21,6 +37,20 @@ export default function DashboardPage() {
       setIsLoading(false);
     }
   }, [isLoggedIn, router]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const to = new Date();
+    const from = new Date();
+    from.setDate(to.getDate() - (STATS_RANGE_DAYS - 1));
+    Promise.all([
+      fetchStatsOverview(),
+      fetchStatsTimeseries(toIsoDate(from), toIsoDate(to)),
+    ]).then(([ov, ts]) => {
+      setOverview(ov);
+      setSeries(ts);
+    });
+  }, [isLoggedIn]);
 
   const handleLogout = () => {
     setIsLoggedIn(false);
@@ -42,33 +72,46 @@ export default function DashboardPage() {
         subTitle="모든 관리자 기능을 확인할 수 있는 곳입니다."
       />
 
-      {/* 메인 콘텐츠: DashboardCard를 사용하여 카드 전체 클릭 시 해당 페이지로 이동 */}
-      <main className="max-w-6xl mx-auto p-4 grid grid-cols-1 md:grid-cols-2 gap-8 pt-12">
-        <DashboardCard
-          title="오디션 관리"
-          description="새로운 오디션을 생성하고, 진행 중인 오디션의 지원자 정보를 조회해 보세요."
-          onClick={() => router.push("/audition")}
-        />
-        <DashboardCard
-          title="공지사항"
-          description="ZIGG의 공지사항을 작성해 보세요."
-          onClick={() => router.push("/notice")}
-        />
-        <DashboardCard
-          title="게시판 관리"
-          description="게시판의 카테고리별 최상단 공지를 작성해보세요."
-          onClick={() => router.push("/board")}
-        />
-        <DashboardCard
-          title="고객 목소리함"
-          description="고객의 소중한 의견을 확인하고 관리해 보세요."
-          onClick={() => router.push("/customerInquiry")}
-        />
-        <DashboardCard
-          title="티켓 수동 지급"
-          description="결제 오류 발생 시 유저 닉네임으로 티켓을 직접 지급합니다."
-          onClick={() => router.push("/ticket")}
-        />
+      <main className="max-w-6xl mx-auto p-4 pt-12">
+        {/* 통계 요약 카드 */}
+        <section className="mb-6">
+          <StatsSummaryCards overview={overview} />
+        </section>
+
+        {/* 통계 차트 영역 */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+          <StatsNationalityChart countryBreakdown={overview?.countryBreakdown} />
+          <StatsDailyUserChart series={series} />
+        </section>
+
+        {/* 관리 메뉴 카드 */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <DashboardCard
+            title="오디션 관리"
+            description="새로운 오디션을 생성하고, 진행 중인 오디션의 지원자 정보를 조회해 보세요."
+            onClick={() => router.push("/audition")}
+          />
+          <DashboardCard
+            title="공지사항"
+            description="ZIGG의 공지사항을 작성해 보세요."
+            onClick={() => router.push("/notice")}
+          />
+          <DashboardCard
+            title="게시판 관리"
+            description="게시판의 카테고리별 최상단 공지를 작성해보세요."
+            onClick={() => router.push("/board")}
+          />
+          <DashboardCard
+            title="고객 목소리함"
+            description="고객의 소중한 의견을 확인하고 관리해 보세요."
+            onClick={() => router.push("/customerInquiry")}
+          />
+          <DashboardCard
+            title="티켓 수동 지급"
+            description="결제 오류 발생 시 유저 닉네임으로 티켓을 직접 지급합니다."
+            onClick={() => router.push("/ticket")}
+          />
+        </section>
       </main>
     </div>
   );

@@ -73,19 +73,8 @@ export default function DashboardPage() {
       />
 
       <main className="max-w-6xl mx-auto p-4 pt-12">
-        {/* 통계 요약 카드 */}
-        <section className="mb-6">
-          <StatsSummaryCards overview={overview} />
-        </section>
-
-        {/* 통계 차트 영역 */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
-          <StatsNationalityChart countryBreakdown={overview?.countryBreakdown} />
-          <StatsDailyUserChart series={series} />
-        </section>
-
         {/* 관리 메뉴 카드 */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
           <DashboardCard
             title="오디션 관리"
             description="새로운 오디션을 생성하고, 진행 중인 오디션의 지원자 정보를 조회해 보세요."
@@ -111,6 +100,17 @@ export default function DashboardPage() {
             description="결제 오류 발생 시 유저 닉네임으로 티켓을 직접 지급합니다."
             onClick={() => router.push("/ticket")}
           />
+        </section>
+
+        {/* 통계 요약 카드 */}
+        <section className="mb-6">
+          <StatsSummaryCards overview={overview} />
+        </section>
+
+        {/* 통계 차트 영역 */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <StatsNationalityChart countryBreakdown={overview?.countryBreakdown} />
+          <StatsDailyUserChart series={series} />
         </section>
       </main>
     </div>

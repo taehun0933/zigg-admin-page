@@ -100,6 +100,11 @@ export default function DashboardPage() {
             description="결제 오류 발생 시 유저 닉네임으로 티켓을 직접 지급합니다."
             onClick={() => router.push("/ticket")}
           />
+          <DashboardCard
+            title="알림 발송"
+            description="전체 유저에게 일반 알림 또는 오디션 알림을 푸시·인앱으로 발송합니다."
+            onClick={() => router.push("/notification")}
+          />
         </section>
 
         {/* 통계 요약 카드 */}

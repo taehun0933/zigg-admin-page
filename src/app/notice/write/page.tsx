@@ -49,12 +49,11 @@ function toRatioString(w: number, h: number): string {
   return `${Math.round(w / g)}:${Math.round(h / g)}`;
 }
 
-// ⬇️ 새 함수: "자르지 않고" 목표 비율   캔버스에 맞춰 패딩
-async function fitAndPadToAspect(
+// 목표 비율로 센터크롭 (cover) — 비율이 안 맞는 만큼 가장자리 잘림
+async function fitAndCropToAspect(
   file: File,
   targetAspect: number,
   minWidth: number,
-  bgColor = BANNER_BACKGROUND,
   mime: string = BANNER_MIME, // "image/jpeg"
   quality: number = BANNER_QUALITY // 0.92
 ): Promise<File> {
@@ -74,8 +73,8 @@ async function fitAndPadToAspect(
     const outW = Math.max(minWidth, sw); // 최소 가로 보장
     const outH = Math.round(outW / targetAspect);
 
-    // 원본을 "contain"으로 스케일 (무크롭)
-    const scale = Math.min(outW / sw, outH / sh);
+    // 캔버스를 꽉 채우는 cover 스케일 (비율이 안 맞는 만큼 가장자리 잘림)
+    const scale = Math.max(outW / sw, outH / sh);
     const dw = Math.round(sw * scale);
     const dh = Math.round(sh * scale);
     const dx = Math.round((outW - dw) / 2);
@@ -85,9 +84,6 @@ async function fitAndPadToAspect(
     canvas.width = outW;
     canvas.height = outH;
     const ctx = canvas.getContext("2d")!;
-    // 배경 채움(흰색). 투명 원하면 PNG로 저장하고 아래 fillRect 지워도 됨.
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, outW, outH);
 
     // 중앙 배치
     ctx.drawImage(img, dx, dy, dw, dh);
@@ -97,16 +93,15 @@ async function fitAndPadToAspect(
     );
 
     const base = file.name.replace(/\.[^/.]+$/, "");
-    const outName = `${base}_padded.${mime === "image/png" ? "png" : "jpg"}`;
+    const outName = `${base}_cropped.${mime === "image/png" ? "png" : "jpg"}`;
     return new File([blob], outName, { type: mime });
   } finally {
     URL.revokeObjectURL(url);
   }
 }
 
-// ⬇️ 기존 normalizeBannerImage를 "크롭" → "패딩"으로 교체
 async function normalizeBannerImage(file: File) {
-  return fitAndPadToAspect(file, BANNER_ASPECT, BANNER_MIN_WIDTH);
+  return fitAndCropToAspect(file, BANNER_ASPECT, BANNER_MIN_WIDTH);
 }
 
 async function cropAndResizeToAspect(
@@ -495,7 +490,7 @@ export default function NoticeCreatePage() {
                   }
 
                   // 3) 보정(패딩 또는 크롭) 수행 후 상태 반영
-                  const fixed = await normalizeBannerImage(raw); // 현재는 fitAndPadToAspect 사용 중
+                  const fixed = await normalizeBannerImage(raw); // 9:5.16 비율로 센터크롭
                   setBannerImageFile(fixed);
                 }}
                 className="sr-only"

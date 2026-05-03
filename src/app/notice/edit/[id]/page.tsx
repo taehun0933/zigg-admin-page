@@ -35,11 +35,10 @@ function toRatioString(w: number, h: number): string {
   const g = gcd(w, h);
   return `${Math.round(w / g)}:${Math.round(h / g)}`;
 }
-async function fitAndPadToAspect(
+async function fitAndCropToAspect(
   file: File,
   targetAspect: number,
   minWidth: number,
-  bgColor = BANNER_BACKGROUND,
   mime: string = BANNER_MIME,
   quality: number = BANNER_QUALITY
 ): Promise<File> {
@@ -57,7 +56,8 @@ async function fitAndPadToAspect(
     const outW = Math.max(minWidth, sw);
     const outH = Math.round(outW / targetAspect);
 
-    const scale = Math.min(outW / sw, outH / sh);
+    // 캔버스를 꽉 채우는 cover 스케일 — 비율이 안 맞는 만큼 가장자리 잘림
+    const scale = Math.max(outW / sw, outH / sh);
     const dw = Math.round(sw * scale);
     const dh = Math.round(sh * scale);
     const dx = Math.round((outW - dw) / 2);
@@ -67,22 +67,20 @@ async function fitAndPadToAspect(
     canvas.width = outW;
     canvas.height = outH;
     const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, outW, outH);
     ctx.drawImage(img, dx, dy, dw, dh);
 
     const blob: Blob = await new Promise((res) =>
       canvas.toBlob((b) => res(b as Blob), mime, quality)
     );
     const base = file.name.replace(/\.[^/.]+$/, "");
-    const outName = `${base}_padded.${mime === "image/png" ? "png" : "jpg"}`;
+    const outName = `${base}_cropped.${mime === "image/png" ? "png" : "jpg"}`;
     return new File([blob], outName, { type: mime });
   } finally {
     URL.revokeObjectURL(url);
   }
 }
 async function normalizeBannerImage(file: File) {
-  return fitAndPadToAspect(file, BANNER_ASPECT, BANNER_MIN_WIDTH);
+  return fitAndCropToAspect(file, BANNER_ASPECT, BANNER_MIN_WIDTH);
 }
 
 // =========================

@@ -11,7 +11,7 @@ export interface PlatformStats {
 
 export async function fetchStatsOverview(): Promise<PlatformStats | null> {
   try {
-    const res = await apiClient.get<PlatformStats>("/admin/v0/stats/overview");
+    const res = await apiClient.get<PlatformStats>("/stats/overview");
     if (!res.data || typeof res.data !== "object") return null;
     return res.data;
   } catch (e) {
@@ -26,7 +26,7 @@ export async function fetchStatsTimeseries(
 ): Promise<PlatformStats[]> {
   try {
     const res = await apiClient.get<PlatformStats[]>(
-      "/admin/v0/stats/timeseries",
+      "/stats/timeseries",
       { params: { from, to } },
     );
     return res.data ?? [];

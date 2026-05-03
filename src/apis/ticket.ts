@@ -17,7 +17,7 @@ export interface TicketGrantResponse {
 
 export async function searchUsersByNickname(nickname: string): Promise<UserSearchResult[]> {
   try {
-    const res = await apiClient.get("/admin/v0/tickets/users/search", {
+    const res = await apiClient.get("/tickets/users/search", {
       params: { nickname },
     });
     return res.data;
@@ -33,7 +33,7 @@ export async function grantTickets(
   reason?: string
 ): Promise<TicketGrantResponse> {
   try {
-    const res = await apiClient.post("/admin/v0/tickets/grant", {
+    const res = await apiClient.post("/tickets/grant", {
       nickname,
       amount,
       reason,

@@ -22,6 +22,10 @@ export const navigationItems = (
     onClick: () => router.push("/ticket"),
   },
   {
+    label: "알림 발송",
+    onClick: () => router.push("/notification"),
+  },
+  {
     label: "로그아웃",
     onClick: handleLogout,
   },

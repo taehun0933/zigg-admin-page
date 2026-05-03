@@ -20,13 +20,17 @@ export const broadcastNotification = async (
 
 /**
  * 특정 오디션 알림(AUDITION_REMINDER) 전체 유저에게 발송.
- * 백엔드가 오디션 정보로 title/body 자동 생성 — 추가 입력 없음.
+ * title/body 미지정(or 빈 문자열) 시 백엔드가 오디션 정보로 자동 생성.
  */
 export const sendAuditionNotification = async (
-  auditionId: number
+  auditionId: number,
+  payload?: { title?: string; body?: string }
 ): Promise<void> => {
   try {
-    await apiClient.post(`/auditions/${auditionId}/notifications`);
+    await apiClient.post(
+      `/auditions/${auditionId}/notifications`,
+      payload ?? {}
+    );
   } catch (error) {
     throw handleApiError(error);
   }

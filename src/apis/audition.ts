@@ -20,6 +20,7 @@ export const postNewAudition = async (body: {
   thumbnailId: number;
   startDate: string;
   endDate: string;
+  isAlwaysOn?: boolean;
 }) => {
   try {
     const response = await apiClient.post("/auditions", body);

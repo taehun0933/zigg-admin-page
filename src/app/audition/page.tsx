@@ -24,6 +24,7 @@ export interface Audition {
   };
   startDate: string;
   endDate: string;
+  isAlwaysOn?: boolean;
 }
 
 const AuditionPage: React.FC = () => {
@@ -34,6 +35,7 @@ const AuditionPage: React.FC = () => {
   const [ongoingAuditions, setOngoingAuditions] = useState<Audition[]>([]);
   const [upcomingAuditions, setUpcomingAuditions] = useState<Audition[]>([]);
   const [completedAuditions, setCompletedAuditions] = useState<Audition[]>([]);
+  const [alwaysOnAuditions, setAlwaysOnAuditions] = useState<Audition[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -51,6 +53,7 @@ const AuditionPage: React.FC = () => {
     thumbnailId: 0,
     startDate: "",
     endDate: "",
+    isAlwaysOn: false,
   });
 
   const getAuditionList = () => {
@@ -93,7 +96,10 @@ const AuditionPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    const hasEmptyField = Object.values(auditionForm).some((v) => v === "");
+    const requiredFields: Array<keyof typeof auditionForm> = auditionForm.isAlwaysOn
+      ? ["title", "company", "qualification", "startDate"]
+      : ["title", "company", "qualification", "startDate", "endDate"];
+    const hasEmptyField = requiredFields.some((k) => auditionForm[k] === "");
 
     if (hasEmptyField) {
       alert("모든 정보를 입력해주세요.");
@@ -129,7 +135,11 @@ const AuditionPage: React.FC = () => {
         return;
       }
 
-      const finalForm = { ...auditionForm, thumbnailId: contentId };
+      const finalForm = {
+        ...auditionForm,
+        thumbnailId: contentId,
+        endDate: auditionForm.isAlwaysOn ? "2999-12-31" : auditionForm.endDate,
+      };
       await postNewAudition(finalForm);
       alert("오디션이 생성되었습니다!");
       setIsModalOpen(false);
@@ -158,12 +168,16 @@ const AuditionPage: React.FC = () => {
       (a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
     );
 
-    const ongoing = sorted.filter(
+    const alwaysOn = sorted.filter((a) => a.isAlwaysOn);
+    const regular = sorted.filter((a) => !a.isAlwaysOn);
+
+    const ongoing = regular.filter(
       (a) => new Date(a.startDate) <= now && new Date(a.endDate) >= now
     );
-    const upcoming = sorted.filter((a) => new Date(a.startDate) > now);
-    const completed = sorted.filter((a) => new Date(a.endDate) < now);
+    const upcoming = regular.filter((a) => new Date(a.startDate) > now);
+    const completed = regular.filter((a) => new Date(a.endDate) < now);
 
+    setAlwaysOnAuditions(alwaysOn);
     setOngoingAuditions(ongoing);
     setUpcomingAuditions(upcoming);
     setCompletedAuditions(completed);
@@ -247,6 +261,23 @@ const AuditionPage: React.FC = () => {
               />
             </div>
 
+            <div>
+              <label className="inline-flex items-center gap-2 font-semibold">
+                <input
+                  type="checkbox"
+                  checked={auditionForm.isAlwaysOn}
+                  onChange={(e) =>
+                    setAuditionForm((prev) => ({
+                      ...prev,
+                      isAlwaysOn: e.target.checked,
+                      endDate: e.target.checked ? "2999-12-31" : "",
+                    }))
+                  }
+                />
+                상시 오디션 (마감일 없이 항상 노출)
+              </label>
+            </div>
+
             <div className="flex gap-4">
               <div className="flex-1">
                 <label className="block font-semibold mb-1">시작일</label>
@@ -265,7 +296,8 @@ const AuditionPage: React.FC = () => {
                   type="date"
                   value={auditionForm.endDate}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded p-2"
+                  disabled={auditionForm.isAlwaysOn}
+                  className="w-full border border-gray-300 rounded p-2 disabled:bg-gray-100 disabled:text-gray-400"
                 />
               </div>
             </div>
@@ -304,6 +336,19 @@ const AuditionPage: React.FC = () => {
       <Navigation items={navItems} />
 
       <main className="max-w-7xl mx-auto px-4 pt-12 pb-24">
+        <section className="mb-12">
+          <h2 className="text-2xl font-semibold mb-6">상시 오디션</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {alwaysOnAuditions.length === 0 ? (
+              <div>등록된 상시 오디션이 없습니다.</div>
+            ) : (
+              alwaysOnAuditions.map((audition) => (
+                <AuditionCard key={audition.id} audition={audition} />
+              ))
+            )}
+          </div>
+        </section>
+
         <section className="mb-12">
           <h2 className="text-2xl font-semibold mb-6">진행중인 오디션</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

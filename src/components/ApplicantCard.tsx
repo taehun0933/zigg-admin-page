@@ -7,6 +7,7 @@ import {
   scrapApplicant,
 } from "@/apis/audition";
 import { AuditionProfileType } from "@/types/audition";
+import { countryNameKo } from "@/utils/countryName";
 import React, { useState } from "react";
 import {
   IoBookmark,
@@ -146,7 +147,7 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({
 
       {/* 국적 / 성별 */}
       <p className="text-sm text-gray-500 mt-1">
-        {nation} | {gender}
+        {countryNameKo(nation)} | {gender}
       </p>
 
       {/* 인스타그램 */}

@@ -7,6 +7,7 @@ import {
   updateAuditionFeedback
 } from "@/apis/feedback";
 import { AuditionProfileType, AuditionFeedback } from "@/types/audition";
+import { countryNameKo } from "@/utils/countryName";
 import React, { useMemo, useState, useEffect } from "react";
 
 interface ApplicantDetailModalContentProps {
@@ -204,7 +205,7 @@ const onSaveEdit = async (fb: AuditionFeedback) => {
 
           {/* 국적 | 성별 */}
           <p className="text-sm text-gray-600 text-center">
-            {applicantInfo.nation} | {applicantInfo.gender}
+            {countryNameKo(applicantInfo.nation)} | {applicantInfo.gender}
           </p>
 
           {/* 인스타그램 링크 */}

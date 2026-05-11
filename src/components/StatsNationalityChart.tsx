@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { countryNameKo } from "@/utils/countryName";
 
 interface Props {
   countryBreakdown: Record<string, number> | null | undefined;
@@ -19,7 +20,10 @@ const TOP_N = 15;
 export default function StatsNationalityChart({ countryBreakdown }: Props) {
   const data = countryBreakdown
     ? Object.entries(countryBreakdown)
-        .map(([country, count]) => ({ country, count }))
+        .map(([code, count]) => ({
+          country: `${countryNameKo(code)} (${code})`,
+          count,
+        }))
         .sort((a, b) => b.count - a.count)
         .slice(0, TOP_N)
     : [];
@@ -38,7 +42,7 @@ export default function StatsNationalityChart({ countryBreakdown }: Props) {
           <BarChart data={data} layout="vertical" margin={{ left: 16, right: 16 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis type="number" allowDecimals={false} />
-            <YAxis type="category" dataKey="country" width={64} />
+            <YAxis type="category" dataKey="country" width={140} />
             <Tooltip />
             <Bar dataKey="count" fill="#3b82f6" />
           </BarChart>

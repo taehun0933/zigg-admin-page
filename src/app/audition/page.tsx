@@ -274,7 +274,7 @@ const AuditionPage: React.FC = () => {
                     }))
                   }
                 />
-                상시 오디션 (마감일 없이 항상 노출)
+                상시 피드백 오디션 (마감일 없이 항상 노출, 지원 시 티켓 1장 차감)
               </label>
             </div>
 
@@ -337,10 +337,10 @@ const AuditionPage: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 pt-12 pb-24">
         <section className="mb-12">
-          <h2 className="text-2xl font-semibold mb-6">상시 오디션</h2>
+          <h2 className="text-2xl font-semibold mb-6">상시 피드백 오디션</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {alwaysOnAuditions.length === 0 ? (
-              <div>등록된 상시 오디션이 없습니다.</div>
+              <div>등록된 상시 피드백 오디션이 없습니다.</div>
             ) : (
               alwaysOnAuditions.map((audition) => (
                 <AuditionCard key={audition.id} audition={audition} />

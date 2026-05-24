@@ -1,237 +1,196 @@
 "use client";
 
-import { useAuth } from "@/contexts/AuthContext";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback, useMemo } from "react";
-import Navigation from "@/components/NavigationBar";
-import { navigationItems } from "@/utils/navigation";
+import AdminShell from "@/components/admin/AdminShell";
+import PageShell, { adminCardStyle, btnPrimary } from "@/components/admin/PageShell";
+import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
 import { AdminBoardPost, getAdminPosts } from "@/apis/board";
 
-interface BoardPost {
-  id: number;
-  title: string;
-  content: string;
-  author: string;
-  createdAt: string;
-  views: number;
-  category: string;
-}
+const CATEGORIES = [
+  { id: "free", name: "자유게시판", boardId: 1, accent: "#007aff", tint: "#ecf3ff" },
+  { id: "promotion", name: "홍보/구인", boardId: 2, accent: "#1f8a52", tint: "#e6f7ee" },
+  { id: "challenge", name: "챌린지", boardId: 3, accent: "#6b3ec9", tint: "#f0ecff" },
+];
 
-// 상단에 매핑 추가
-const activeTabClasses: Record<string, string> = {
-  free: "text-blue-600 border-blue-600",
-  promotion: "text-green-600 border-green-600",
-  challenge: "text-purple-600 border-purple-600",
-};
-
-// 교체 후
 const formatYmdHm = (iso: string) => {
-  const parts = new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date(iso));
-
-  const get = (t: Intl.DateTimeFormatPartTypes) =>
-    parts.find((p) => p.type === t)?.value ?? "";
-
-  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get(
-    "minute"
-  )}`;
+  try {
+    const parts = new Intl.DateTimeFormat("ko-KR", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date(iso));
+    const get = (t: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === t)?.value ?? "";
+    return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
+  } catch {
+    return iso;
+  }
 };
 
-const Board: React.FC = () => {
+const BoardPage: React.FC = () => {
   const router = useRouter();
-  const { setIsLoggedIn, isLoggedIn } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("free");
+  const ready = useAdminAuthGuard();
+  const [activeId, setActiveId] = useState("free");
   const [posts, setPosts] = useState<AdminBoardPost[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const boardIdMap: Record<string, number> = useMemo(
-    () => ({
-      free: 1,
-      promotion: 2,
-      challenge: 3,
-    }),
-    []
-  );
+  const active = useMemo(() => CATEGORIES.find((c) => c.id === activeId)!, [activeId]);
 
-  const fetchPosts = useCallback(
-    async (category: string) => {
-      try {
-        const boardId = boardIdMap[category];
-        const data = await getAdminPosts(boardId);
-        setPosts(data);
-      } catch (e) {
-        console.error("게시글 불러오기 실패:", e);
-      }
-    },
-    [boardIdMap]
-  );
+  const fetchPosts = useCallback(async (boardId: number) => {
+    setLoading(true);
+    try {
+      const data = await getAdminPosts(boardId);
+      setPosts(data ?? []);
+    } catch (e) {
+      console.error("게시글 불러오기 실패", e);
+      setPosts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const categories = [
-    { id: "free", name: "자유", color: "bg-blue-500" },
-    { id: "promotion", name: "홍보/구인", color: "bg-green-500" },
-    { id: "challenge", name: "첼린지", color: "bg-purple-500" },
-  ];
-
-  // 로그인 체크 전용
   useEffect(() => {
-    if (!isLoggedIn) {
-      router.replace("/signin");
-    }
-  }, [isLoggedIn, router]);
+    if (!ready) return;
+    fetchPosts(active.boardId);
+  }, [ready, active.boardId, fetchPosts]);
 
-  // 게시글 불러오기 전용
-  useEffect(() => {
-    if (isLoggedIn) {
-      setIsLoading(true);
-      fetchPosts(activeTab).finally(() => setIsLoading(false));
-    }
-  }, [isLoggedIn, activeTab, fetchPosts]); // 👈 fetchPosts 추가
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    router.push("/signin");
-  };
-
-  const handleDeletePost = (id: number) => {
-    if (confirm("정말로 이 글을 삭제하시겠습니까?")) {
-      setPosts(posts.filter((post) => post.postId !== id));
-      alert("글이 삭제되었습니다.");
-    }
-  };
-
-  const filteredPosts = posts.filter(
-    (post) => post.boardId === boardIdMap[activeTab]
-  );
-
-  const navItems = navigationItems(router, handleLogout);
-
-  if (isLoading) {
-    return null;
-  }
+  if (!ready) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
-      <Navigation items={navItems} />
-      <main className="max-w-6xl mx-auto p-4 pt-12">
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          {/* 상단 - 제목과 글 쓰기 버튼 */}
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">게시판 관리</h1>
-              <p className="text-gray-600 mt-2">카테고리별 게시글 관리</p>
+    <AdminShell>
+      <PageShell
+        eyebrow="게시판 관리"
+        title="카테고리별 운영자 게시글"
+        subtitle="관리자가 작성한 게시글을 카테고리별로 관리합니다."
+        action={
+          <button
+            style={btnPrimary}
+            onClick={() => router.push(`/board/write?category=${active.id}&boardId=${active.boardId}`)}
+          >
+            + 글 쓰기
+          </button>
+        }
+      >
+        {/* category chips */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto" }}>
+          {CATEGORIES.map((c) => {
+            const isActive = c.id === activeId;
+            return (
+              <button
+                key={c.id}
+                onClick={() => setActiveId(c.id)}
+                style={{
+                  height: 36,
+                  padding: "0 14px",
+                  borderRadius: 999,
+                  background: isActive ? "#1a1a1f" : "#fff",
+                  color: isActive ? "#fff" : "var(--admin-ink)",
+                  border: isActive ? "none" : "1px solid var(--admin-border)",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.accent }} />
+                {c.name}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ ...adminCardStyle, overflow: "hidden" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "80px 1fr 160px 160px 100px",
+              padding: "12px 22px",
+              borderBottom: "1px solid var(--admin-border)",
+              fontSize: 11,
+              fontWeight: 700,
+              color: "var(--admin-ink-3)",
+              letterSpacing: 0.4,
+              textTransform: "uppercase",
+            }}
+          >
+            <span>#</span>
+            <span>제목</span>
+            <span>작성자</span>
+            <span>작성일</span>
+            <span style={{ textAlign: "right" }}>액션</span>
+          </div>
+          {loading ? (
+            <div style={{ padding: 40, textAlign: "center", color: "var(--admin-ink-3)", fontSize: 13 }}>
+              불러오는 중…
             </div>
-            <button
-              onClick={() =>
-                router.push(
-                  `/board/write?category=${activeTab}&boardId=${boardIdMap[activeTab]}`
-                )
-              }
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold"
-            >
-              글 쓰기
-            </button>
-          </div>
-
-          {/* 탭 네비게이션 */}
-          <div className="border-b border-gray-200 mb-6">
-            <nav
-              className="-mb-px flex space-x-8"
-              role="tablist"
-              aria-label="게시판 카테고리"
-            >
-              {categories.map((category) => {
-                const isActive = activeTab === category.id;
-                return (
-                  <button
-                    key={category.id}
-                    role="tab"
-                    aria-selected={isActive}
-                    onClick={() => setActiveTab(category.id)}
-                    className={[
-                      "py-2 px-1 text-sm font-medium border-b-2 transition-colors",
-                      isActive
-                        ? activeTabClasses[category.id] // 활성 색상(파란/초록/보라)
-                        : "text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300",
-                    ].join(" ")}
-                  >
-                    {category.name}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* 글 목록 */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    번호
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    제목
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    작성자
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    작성일
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    관리
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPosts.map((post) => (
-                  <tr key={post.postId} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {post.postId}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {post.postTitle}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {post.postCreator.userName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatYmdHm(post.createdAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() =>
-                          router.push(
-                            `/board/edit?boardId=${post.boardId}&postId=${post.postId}`
-                          )
-                        }
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        수정 및 삭제
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredPosts.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-gray-500">등록된 게시글이 없습니다.</p>
+          ) : posts.length === 0 ? (
+            <div style={{ padding: 40, textAlign: "center", color: "var(--admin-ink-3)", fontSize: 13 }}>
+              등록된 게시글이 없습니다.
             </div>
+          ) : (
+            posts.map((p, i) => (
+              <div
+                key={p.postId}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "80px 1fr 160px 160px 100px",
+                  padding: "14px 22px",
+                  borderTop: i ? "1px solid var(--admin-border)" : "none",
+                  alignItems: "center",
+                  fontSize: 13,
+                  gap: 12,
+                }}
+              >
+                <span
+                  style={{ fontVariantNumeric: "tabular-nums", color: "var(--admin-ink-2)" }}
+                >
+                  #{p.postId}
+                </span>
+                <span
+                  style={{
+                    fontWeight: 600,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {p.postTitle || "(제목 없음)"}
+                </span>
+                <span style={{ color: "var(--admin-ink-2)" }}>{p.postCreator?.userName}</span>
+                <span
+                  style={{
+                    color: "var(--admin-ink-2)",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {formatYmdHm(p.createdAt)}
+                </span>
+                <button
+                  onClick={() =>
+                    router.push(`/board/edit?boardId=${p.boardId}&postId=${p.postId}`)
+                  }
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--admin-blue)",
+                    textAlign: "right",
+                  }}
+                >
+                  수정·삭제
+                </button>
+              </div>
+            ))
           )}
         </div>
-      </main>
-    </div>
+      </PageShell>
+    </AdminShell>
   );
 };
 
-export default Board;
+export default BoardPage;

@@ -1,6 +1,66 @@
 @import "tailwindcss";
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css");
+
+:root {
+  /* Admin chrome */
+  --admin-bg: #f7f8fa;
+  --admin-card: #ffffff;
+  --admin-border: #ececf0;
+
+  /* Text */
+  --admin-ink: #1a1a1f;
+  --admin-ink-2: #6b6b76;
+  --admin-ink-3: #a1a1aa;
+
+  /* Accents */
+  --admin-blue: #007aff;
+  --admin-blue-tint: #ecf3ff;
+  --admin-warn: #ff9f0a;
+  --admin-warn-tint: #fff4e0;
+  --admin-good: #2dbd6f;
+  --admin-good-tint: #e6f7ee;
+
+  /* Layout */
+  --admin-sidebar-w: 244px;
+  --admin-sidebar-collapsed: 72px;
+  --admin-topbar-h: 60px;
+
+  /* Brand */
+  --zg-grad-logo: linear-gradient(180deg, #129d91 0%, #0b8aaa 50%, #0b6cb3 100%);
+  --zg-font-sans: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Helvetica Neue", "Segoe UI", Roboto, sans-serif;
+}
 
 * {
-  font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
-    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  font-family: var(--zg-font-sans);
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: var(--admin-bg);
+  color: var(--admin-ink);
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: inherit;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  letter-spacing: -0.011em;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--admin-ink-3);
 }

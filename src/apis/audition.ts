@@ -37,10 +37,12 @@ export const getAuditionInfo = async (body: {
   pageNum: number;
   filter: AuditionFilterType;
   name?: string;
+  size?: number;
 }): Promise<AuditionInfoType> => {
   try {
     const params: Record<string, any> = {
       page: body.pageNum,
+      size: body.size ?? 10,
     };
 
     if (body.filter === "scrap") {

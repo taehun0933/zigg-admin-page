@@ -1,11 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import Navigation from "@/components/NavigationBar";
-import { navigationItems } from "@/utils/navigation";
-import { useAuth } from "@/contexts/AuthContext";
-import { Pagination } from "@mui/material";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import AdminShell from "@/components/admin/AdminShell";
+import PageShell, { adminCardStyle, btnPrimary } from "@/components/admin/PageShell";
+import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
 import Modal from "@/components/Modal";
 import {
   getCustomerInquiryMessages,
@@ -16,49 +14,30 @@ import {
   CustomerInquiryReplyType,
 } from "@/types/customerInquiry";
 import { formatYmdHm } from "@/utils/common";
+import { Pagination } from "@mui/material";
 
 const PAGE_SIZE = 20;
 
-function ReplyItem({ reply }: { reply: CustomerInquiryReplyType }) {
-  return (
-    <div className="bg-white rounded-lg p-3 border border-gray-100 shadow-sm">
-      <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
-        <span className="font-medium text-gray-700">
-          {reply.sender.userNickname}
-        </span>
-        <span>{formatYmdHm(reply.createdAt)}</span>
-      </div>
-      <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
-        {reply.message}
-      </p>
-    </div>
-  );
-}
+type Tab = "open" | "done";
 
-export default function CustomerInquiryPage() {
-  const router = useRouter();
-  const { isLoggedIn, setIsLoggedIn } = useAuth();
-
-  const [mounted, setMounted] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+const CustomerInquiryPage: React.FC = () => {
+  const ready = useAdminAuthGuard();
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState<CustomerInquiryDetailType[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
+  const [tab, setTab] = useState<Tab>("open");
 
-  const [selectedInquiry, setSelectedInquiry] =
-    useState<CustomerInquiryDetailType | null>(null);
+  const [selected, setSelected] = useState<CustomerInquiryDetailType | null>(null);
   const [replyText, setReplyText] = useState("");
   const [replySending, setReplySending] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const fetchMessages = useCallback(async (page: number) => {
+    setLoading(true);
+    setError(null);
     try {
-      setError(null);
       const data = await getCustomerInquiryMessages({
         page: page - 1,
         size: PAGE_SIZE,
@@ -71,61 +50,37 @@ export default function CustomerInquiryPage() {
       setError("문의 목록을 불러오지 못했어요.");
       setContent([]);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (!mounted) return;
-    if (!isLoggedIn) {
-      router.replace("/signin");
-      return;
-    }
-    setIsLoading(true);
+    if (!ready) return;
     fetchMessages(currentPage);
-  }, [mounted, isLoggedIn, currentPage, fetchMessages, router]);
+  }, [ready, currentPage, fetchMessages]);
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    router.push("/signin");
-  };
+  const counts = useMemo(() => {
+    const open = content.filter((c) => c.replies.length === 0).length;
+    const done = content.filter((c) => c.replies.length >= 1).length;
+    return { open, done };
+  }, [content]);
 
-  const handlePageChange = (
-    _event: React.ChangeEvent<unknown>,
-    value: number
-  ) => {
-    setCurrentPage(value);
-  };
-
-  const openDetail = (item: CustomerInquiryDetailType) => {
-    setSelectedInquiry(item);
-    setReplyText("");
-    setReplyError(null);
-  };
-
-  const closeDetail = () => {
-    setSelectedInquiry(null);
-    setReplyText("");
-    setReplyError(null);
-  };
+  const filtered = useMemo(
+    () => content.filter((c) => (tab === "open" ? c.replies.length === 0 : c.replies.length >= 1)),
+    [content, tab],
+  );
 
   const handleSendReply = async () => {
-    if (!selectedInquiry || !replyText.trim()) return;
+    if (!selected || !replyText.trim()) return;
     setReplySending(true);
     setReplyError(null);
     try {
-      const newReply = await postCustomerInquiryReply(selectedInquiry.id, {
-        message: replyText.trim(),
-      });
-      setSelectedInquiry((prev) =>
-        prev ? { ...prev, replies: [...prev.replies, newReply] } : null
+      const newReply = await postCustomerInquiryReply(selected.id, { message: replyText.trim() });
+      setSelected((prev) =>
+        prev ? { ...prev, replies: [...prev.replies, newReply] } : null,
       );
       setContent((prev) =>
-        prev.map((it) =>
-          it.id === selectedInquiry.id
-            ? { ...it, replies: [...it.replies, newReply] }
-            : it
-        )
+        prev.map((it) => (it.id === selected.id ? { ...it, replies: [...it.replies, newReply] } : it)),
       );
       setReplyText("");
     } catch (e) {
@@ -136,177 +91,281 @@ export default function CustomerInquiryPage() {
     }
   };
 
-  const navItems = navigationItems(router, handleLogout);
-
-  if (!mounted) return <div className="min-h-screen bg-gray-50" />;
-  if (!isLoggedIn) return null;
+  if (!ready) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
+    <AdminShell>
+      <PageShell
+        eyebrow="고객 목소리함"
+        title="유저 의견 응대"
+        subtitle="유저가 보낸 의견·문의를 확인하고 응답합니다."
+      >
+        {/* tabs */}
+        <div
+          style={{
+            display: "inline-flex",
+            gap: 4,
+            padding: 3,
+            background: "#f3f3f6",
+            borderRadius: 9,
+            marginBottom: 14,
+          }}
+        >
+          {(
+            [
+              { id: "open", label: `미답변 (${counts.open})` },
+              { id: "done", label: `답변 완료 (${counts.done})` },
+            ] as { id: Tab; label: string }[]
+          ).map((t) => {
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                style={{
+                  height: 30,
+                  padding: "0 14px",
+                  borderRadius: 6,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background: active ? "#fff" : "transparent",
+                  color: active ? "var(--admin-ink)" : "var(--admin-ink-2)",
+                  boxShadow: active ? "0 1px 2px rgba(0,0,0,.06)" : "none",
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ ...adminCardStyle, overflow: "hidden" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "70px 120px 1fr 80px 160px 80px",
+              padding: "12px 22px",
+              borderBottom: "1px solid var(--admin-border)",
+              fontSize: 11,
+              fontWeight: 700,
+              color: "var(--admin-ink-3)",
+              letterSpacing: 0.4,
+              textTransform: "uppercase",
+            }}
+          >
+            <span>#</span>
+            <span>닉네임</span>
+            <span>제목</span>
+            <span style={{ textAlign: "center" }}>답장수</span>
+            <span>작성일</span>
+            <span style={{ textAlign: "right" }}>액션</span>
+          </div>
+
+          {loading && (
+            <div style={{ padding: 40, textAlign: "center", color: "var(--admin-ink-3)", fontSize: 13 }}>
+              불러오는 중…
+            </div>
+          )}
+          {!loading && error && (
+            <div style={{ padding: 40, textAlign: "center", color: "#cc3333", fontSize: 13 }}>{error}</div>
+          )}
+          {!loading && !error && filtered.length === 0 && (
+            <div style={{ padding: 40, textAlign: "center", color: "var(--admin-ink-3)", fontSize: 13 }}>
+              표시할 항목이 없어요.
+            </div>
+          )}
+
+          {!loading &&
+            !error &&
+            filtered.map((v, i) => (
+              <div
+                key={v.id}
+                onClick={() => {
+                  setSelected(v);
+                  setReplyText("");
+                  setReplyError(null);
+                }}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "70px 120px 1fr 80px 160px 80px",
+                  padding: "14px 22px",
+                  borderTop: i ? "1px solid var(--admin-border)" : "none",
+                  alignItems: "center",
+                  gap: 12,
+                  cursor: "pointer",
+                  background: "#fff",
+                  transition: "background .15s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--admin-bg)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+              >
+                <span style={{ fontSize: 12, color: "var(--admin-ink-3)", fontVariantNumeric: "tabular-nums" }}>
+                  #{v.id}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{v.user.userNickname}</span>
+                <span
+                  style={{
+                    fontSize: 14,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {v.title || "(제목 없음)"}
+                </span>
+                <span
+                  style={{
+                    textAlign: "center",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: v.replies.length >= 1 ? "var(--admin-good)" : "var(--admin-ink-3)",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {v.replies.length}
+                </span>
+                <span style={{ fontSize: 12, color: "var(--admin-ink-3)", fontVariantNumeric: "tabular-nums" }}>
+                  {formatYmdHm(v.createdAt)}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--admin-blue)", textAlign: "right" }}>
+                  응답 →
+                </span>
+              </div>
+            ))}
+        </div>
+
+        {!loading && !error && totalPages > 1 && (
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 24 }}>
+            <Pagination
+              count={totalPages}
+              page={currentPage}
+              onChange={(_e, v) => setCurrentPage(v)}
+              showFirstButton
+              showLastButton
+            />
+          </div>
+        )}
+      </PageShell>
+
       <Modal
-        isOpen={!!selectedInquiry}
-        onClose={closeDetail}
-        title={selectedInquiry ? selectedInquiry.title : ""}
+        isOpen={!!selected}
+        onClose={() => {
+          setSelected(null);
+          setReplyText("");
+          setReplyError(null);
+        }}
+        title={selected?.title ?? ""}
         sizeMode="LARGE"
       >
-        {selectedInquiry && (
-          <div className="flex flex-col min-h-0">
-            {/* 문의 상세 */}
-            <div className="border-b border-gray-200 pb-4 mb-4">
-              <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-                <span>{selectedInquiry.user.userNickname}</span>
+        {selected && (
+          <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
+            <div style={{ borderBottom: "1px solid var(--admin-border)", paddingBottom: 14, marginBottom: 14 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 12,
+                  color: "var(--admin-ink-3)",
+                  marginBottom: 6,
+                }}
+              >
+                <span style={{ fontWeight: 600, color: "var(--admin-ink)" }}>
+                  {selected.user.userNickname}
+                </span>
                 <span>·</span>
-                <span>{formatYmdHm(selectedInquiry.createdAt)}</span>
+                <span>{formatYmdHm(selected.createdAt)}</span>
               </div>
-              <p className="text-gray-800 whitespace-pre-wrap break-words">
-                {selectedInquiry.message}
-              </p>
+              <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.55, margin: 0 }}>{selected.message}</p>
             </div>
 
-            {/* 답장 목록 (스크롤) */}
-            <div className="flex-1 overflow-y-auto max-h-[280px] min-h-[80px] space-y-3 pr-2 border border-gray-100 rounded-lg p-3 bg-gray-50">
-              {selectedInquiry.replies.length === 0 ? (
-                <p className="text-gray-400 text-sm py-4 text-center">
+            <div
+              style={{
+                background: "var(--admin-bg)",
+                border: "1px solid var(--admin-border)",
+                borderRadius: 12,
+                padding: 12,
+                maxHeight: 280,
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              {selected.replies.length === 0 ? (
+                <div style={{ textAlign: "center", color: "var(--admin-ink-3)", padding: 14, fontSize: 13 }}>
                   아직 답장이 없어요.
-                </p>
+                </div>
               ) : (
-                selectedInquiry.replies.map((reply) => (
-                  <ReplyItem key={reply.id} reply={reply} />
-                ))
+                selected.replies.map((r) => <ReplyItem key={r.id} reply={r} />)
               )}
             </div>
 
-            {/* 답장 입력 */}
-            <div className="mt-4 border-t border-gray-200 pt-4">
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--admin-border)" }}>
               {replyError && (
-                <p className="text-red-600 text-sm mb-2">{replyError}</p>
+                <div style={{ color: "#cc3333", fontSize: 12, marginBottom: 8 }}>{replyError}</div>
               )}
               <textarea
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
-                placeholder="답장을 입력하세요..."
+                placeholder="답장을 입력하세요…"
                 rows={3}
-                className="w-full border border-gray-300 rounded-lg p-3 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 disabled={replySending}
+                style={{
+                  width: "100%",
+                  borderRadius: 10,
+                  border: "1px solid var(--admin-border)",
+                  padding: 12,
+                  fontSize: 14,
+                  outline: "none",
+                  resize: "vertical",
+                  lineHeight: 1.5,
+                }}
               />
-              <div className="flex justify-end mt-2">
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
                 <button
-                  type="button"
                   onClick={handleSendReply}
                   disabled={replySending || !replyText.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                  style={{
+                    ...btnPrimary,
+                    background: !replyText.trim() || replySending ? "#c4c4cc" : "var(--admin-blue)",
+                    cursor: !replyText.trim() || replySending ? "not-allowed" : "pointer",
+                  }}
                 >
-                  {replySending ? "전송 중..." : "답장 보내기"}
+                  {replySending ? "전송 중…" : "답장 보내기"}
                 </button>
               </div>
             </div>
           </div>
         )}
       </Modal>
-
-      <Navigation items={navItems} />
-
-      <main className="max-w-6xl mx-auto p-4 pt-12">
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-800">고객 목소리함</h1>
-            <p className="text-gray-600 mt-2">
-              고객 문의 목록을 확인하고 답장할 수 있어요.
-            </p>
-          </div>
-
-          {isLoading && (
-            <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
-            </div>
-          )}
-
-          {!isLoading && error && (
-            <div className="text-center text-red-600 py-10">{error}</div>
-          )}
-
-          {!isLoading && !error && content.length === 0 && (
-            <div className="text-center text-gray-500 py-10">
-              등록된 문의가 없습니다.
-            </div>
-          )}
-
-          {!isLoading && !error && content.length > 0 && (
-            <>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        번호
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        제목
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        작성자
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        답장 수
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        답장 여부
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        작성일
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {content.map((item) => (
-                      <tr
-                        key={item.id}
-                        className="hover:bg-gray-50 cursor-pointer"
-                        onClick={() => openDetail(item)}
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {item.id}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
-                          {item.title}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {item.user.userNickname}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {item.replies.length}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {item.replies.length >= 1 ? (
-                            <span className="text-green-600 font-medium" title="답장 완료">
-                              ✓
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatYmdHm(item.createdAt)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex justify-center mt-8">
-                <Pagination
-                  count={totalPages}
-                  page={currentPage}
-                  onChange={handlePageChange}
-                  showFirstButton
-                  showLastButton
-                />
-              </div>
-            </>
-          )}
-        </div>
-      </main>
-    </div>
+    </AdminShell>
   );
-}
+};
+
+const ReplyItem: React.FC<{ reply: CustomerInquiryReplyType }> = ({ reply }) => (
+  <div
+    style={{
+      background: "#fff",
+      borderRadius: 8,
+      padding: 10,
+      border: "1px solid var(--admin-border)",
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        gap: 8,
+        fontSize: 12,
+        color: "var(--admin-ink-3)",
+        marginBottom: 4,
+      }}
+    >
+      <span style={{ color: "var(--admin-ink-2)", fontWeight: 600 }}>{reply.sender.userNickname}</span>
+      <span>{formatYmdHm(reply.createdAt)}</span>
+    </div>
+    <p style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 13 }}>{reply.message}</p>
+  </div>
+);
+
+export default CustomerInquiryPage;

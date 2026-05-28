@@ -30,6 +30,15 @@ const TYPE_TONE: Record<string, { tint: string; fg: string }> = {
 };
 const defaultTone = { tint: "var(--admin-blue-tint)", fg: "var(--admin-blue)" };
 
+// 입력값에 이미 단위가 붙어있으면 그대로, 숫자만 있으면 단위 부착.
+const fmtMeasurement = (v: string | number | undefined | null, unit: string): string => {
+  if (v === undefined || v === null || v === "") return "—";
+  const s = String(v).trim();
+  if (!s) return "—";
+  if (/[a-zA-Z'"]\s*$/.test(s)) return s;
+  return `${s}${unit}`;
+};
+
 const ApplicantDetailModal: React.FC<Props> = ({
   applicant,
   onClose,
@@ -383,9 +392,9 @@ const ApplicantDetailModal: React.FC<Props> = ({
                   marginTop: 4,
                 }}
               >
-                <Stat label="키" value={a.height ? `${a.height}cm` : "—"} />
+                <Stat label="키" value={fmtMeasurement(a.height, "cm")} />
                 <Divider />
-                <Stat label="몸무게" value={a.weight ? `${a.weight}kg` : "—"} />
+                <Stat label="몸무게" value={fmtMeasurement(a.weight, "kg")} />
                 <Divider />
                 <Stat label="출생연도" value={a.ageOrYear || "—"} />
               </div>
@@ -841,9 +850,9 @@ const MetaRow: React.FC<{ icon: string; label: string; children: React.ReactNode
     <span
       style={{
         textAlign: "right",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
+        minWidth: 0,
+        wordBreak: "break-all",
+        lineHeight: 1.35,
       }}
     >
       {children}

@@ -46,6 +46,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const refreshFeedbacks = useCallback(async () => {
     if (!applicant) return;
@@ -68,6 +69,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
     setSuccess(null);
     setFeedbackText("");
     refreshFeedbacks();
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
     setTimeout(() => textareaRef.current?.focus(), 80);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applicant?.id]);
@@ -138,6 +140,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
 
   return (
     <div
+      ref={scrollRef}
       role="dialog"
       aria-modal="true"
       onClick={onClose}

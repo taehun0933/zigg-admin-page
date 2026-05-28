@@ -284,7 +284,12 @@ const AuditionDetailPage: React.FC = () => {
   };
 
   const handleRailEntryClick = (a: AuditionProfileType) => {
-    // 현재 로드된 영역에 있으면 스크롤, 아니면 상세 모달.
+    // 합격자 탭: 항상 상세 모달.
+    // 북마크 탭: 현재 로드된 영역에 있으면 스크롤, 아니면 상세 모달.
+    if (railTab === "like") {
+      setSelected(a);
+      return;
+    }
     if (!jumpToCard(a.id)) setSelected(a);
   };
 

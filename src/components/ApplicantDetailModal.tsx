@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   getAuditionFeedbacks,
   sendApplicationFeedback,
@@ -69,9 +69,26 @@ const ApplicantDetailModal: React.FC<Props> = ({
     setSuccess(null);
     setFeedbackText("");
     refreshFeedbacks();
-    if (scrollRef.current) scrollRef.current.scrollTop = 0;
-    setTimeout(() => textareaRef.current?.focus(), 80);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicant?.id]);
+
+  // 지원자 바뀔 때 스크롤 맨 위로. paint 전에 한 번, 다음 프레임에 또 한 번(컨텐츠 늘어나도 보정).
+  useLayoutEffect(() => {
+    if (!applicant) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = 0;
+    const r1 = requestAnimationFrame(() => {
+      el.scrollTop = 0;
+      const r2 = requestAnimationFrame(() => {
+        el.scrollTop = 0;
+      });
+      (el as any).__r2 = r2;
+    });
+    return () => {
+      cancelAnimationFrame(r1);
+      if ((el as any).__r2) cancelAnimationFrame((el as any).__r2);
+    };
   }, [applicant?.id]);
 
   useEffect(() => {

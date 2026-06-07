@@ -68,9 +68,13 @@ const AuditionDetailPage: React.FC = () => {
 
   const [selected, setSelected] = useState<AuditionProfileType | null>(null);
 
+  // 북마크 클릭 시 스크롤할 대상(아직 로드 안 됐을 수 있어 effect로 처리)
+  const [scrollTarget, setScrollTarget] = useState<number | null>(null);
+
   const cardRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const fetchingRef = useRef(false);
   const lastReqRef = useRef(0);
+  const loadingTargetRef = useRef(false);
 
   // debounce search
   useEffect(() => {
@@ -283,14 +287,60 @@ const AuditionDetailPage: React.FC = () => {
     return false;
   };
 
+  // 북마크 대상이 아직 로드 안 됐으면 나올 때까지 다음 페이지를 받아온 뒤 스크롤한다.
+  const ensureLoadedAndScroll = useCallback(
+    async (appId: number) => {
+      if (jumpToCard(appId)) return;
+      setScrollTarget(appId); // 아래 effect가 content에 등장하면 스크롤
+      if (loadingTargetRef.current) return;
+      loadingTargetRef.current = true;
+      try {
+        let page = pageNum;
+        let pages = totalPages;
+        let guard = 0;
+        while (page + 1 < pages && guard < 100) {
+          page += 1;
+          guard += 1;
+          const data = await getAuditionInfo({
+            auditionId: id,
+            pageNum: page,
+            filter,
+            name: debouncedQuery || undefined,
+          });
+          pages = data.totalPages;
+          setTotalPages(data.totalPages);
+          setTotalElements(data.totalElements);
+          setContent((prev) => {
+            const seen = new Set(prev.map((p) => p.id));
+            return [...prev, ...data.content.filter((c) => !seen.has(c.id))];
+          });
+          setPageNum(page);
+          if (data.content.some((c) => c.id === appId)) break;
+        }
+      } catch (e) {
+        console.error("책갈피 위치 로드 실패", e);
+      } finally {
+        loadingTargetRef.current = false;
+      }
+    },
+    [pageNum, totalPages, id, filter, debouncedQuery],
+  );
+
+  // scrollTarget이 content에 등장하면 스크롤하고 타깃 해제
+  useEffect(() => {
+    if (scrollTarget == null) return;
+    if (jumpToCard(scrollTarget)) setScrollTarget(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content, scrollTarget]);
+
   const handleRailEntryClick = (a: AuditionProfileType) => {
-    // 합격자 탭: 항상 상세 모달.
-    // 북마크 탭: 현재 로드된 영역에 있으면 스크롤, 아니면 상세 모달.
+    // 합격자 탭: 항상 상세 프로필 모달.
+    // 북마크 탭: 책갈피처럼 해당 카드 위치로 이동(필요하면 로드 후 스크롤).
     if (railTab === "like") {
       setSelected(a);
       return;
     }
-    if (!jumpToCard(a.id)) setSelected(a);
+    ensureLoadedAndScroll(a.id);
   };
 
   if (!ready) return null;

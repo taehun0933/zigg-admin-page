@@ -1,7 +1,8 @@
 "use client";
 
-import { 
-  getAuditionFeedbacks, 
+import {
+  getAuditionFeedbacks,
+  getApplicantFeedbackHistory,
   sendApplicationFeedback,
   deleteAuditionFeedback,
   updateAuditionFeedback
@@ -13,6 +14,15 @@ import React, { useMemo, useState, useEffect } from "react";
 interface ApplicantDetailModalContentProps {
   applicantInfo: AuditionProfileType | null;
 }
+
+// "2026-05-22 14:33" 형태
+const formatDateTime = (iso?: string | null): string => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
 
 const ApplicantDetailModalContent: React.FC<ApplicantDetailModalContentProps> = ({
   applicantInfo
@@ -27,6 +37,10 @@ const ApplicantDetailModalContent: React.FC<ApplicantDetailModalContentProps> = 
   const [feedbacks, setFeedbacks] = useState<AuditionFeedback[]>([]);
   const [isLoadingFeedbacks, setIsLoadingFeedbacks] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // 같은 지원자에게 이전 오디션에서 남긴 내 피드백 (연결성 있는 피드백용)
+  const [history, setHistory] = useState<AuditionFeedback[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const canSend = useMemo(() => feedbackText.trim().length > 0 && !isSending, [feedbackText, isSending]);
 
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -36,6 +50,7 @@ const ApplicantDetailModalContent: React.FC<ApplicantDetailModalContentProps> = 
   useEffect(() => {
   if (!applicantInfo) return;
   refreshFeedbacks();
+  refreshHistory();
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [applicantInfo?.id]);
 
@@ -88,6 +103,21 @@ const ApplicantDetailModalContent: React.FC<ApplicantDetailModalContentProps> = 
       setLoadError(e?.message ?? "피드백 목록을 불러오지 못했어요.");
     } finally {
       setIsLoadingFeedbacks(false);
+    }
+  };
+
+  const refreshHistory = async () => {
+    if (!applicantInfo) return;
+
+    try {
+      setIsLoadingHistory(true);
+      const data = await getApplicantFeedbackHistory(applicantInfo.auditionId, applicantInfo.id);
+      setHistory(Array.isArray(data) ? data : []);
+    } catch {
+      // 이전 피드백은 보조 정보이므로 실패해도 본문 흐름을 막지 않음
+      setHistory([]);
+    } finally {
+      setIsLoadingHistory(false);
     }
   };
 
@@ -299,139 +329,169 @@ const onSaveEdit = async (fb: AuditionFeedback) => {
           <p className="text-gray-500 text-sm">등록된 비디오가 없습니다.</p>
         )}
         
-          {/* ✅ 여기부터: 피드백 작성/전송 UI (비디오 아래) */}
-          <div className="mt-8 bg-gray-100 p-6 rounded-lg">
-          <h4 className="text-lg font-semibold mb-3">피드백 보내기</h4>
+          {/* ── 피드백 작성/전송 ── */}
+          <div className="mt-8 bg-gray-50 border border-gray-200 p-6 rounded-2xl">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <h4 className="text-lg font-semibold">피드백 보내기</h4>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setFeedbackText("")}
+                  disabled={isSending || feedbackText.length === 0}
+                  className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  초기화
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendFeedback}
+                  disabled={!canSend}
+                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-white ${
+                    canSend ? "bg-indigo-500 hover:bg-indigo-600" : "bg-indigo-300 cursor-not-allowed"
+                  }`}
+                >
+                  <span aria-hidden>📣</span>
+                  {isSending ? "전송 중..." : "피드백 전송"}
+                </button>
+              </div>
+            </div>
 
-          <textarea
-            value={feedbackText}
-            onChange={(e) => setFeedbackText(e.target.value)}
-            placeholder="지원자에게 전달할 피드백을 입력해 주세요."
-            className="w-full h-32 p-3 border border-gray-300 rounded resize-y bg-white"
-          />
+            <textarea
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              placeholder="지원자에게 전달할 피드백을 입력해 주세요."
+              className="w-full h-32 p-3 border border-gray-300 rounded-xl resize-y bg-white"
+            />
+            <p className="mt-2 text-sm text-gray-400">
+              {feedbackText.length}자 · 지원자 앱으로 푸시 알림과 함께 전송됩니다.
+            </p>
 
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={handleSendFeedback}
-              disabled={!canSend}
-              className={`px-4 py-2 rounded text-white ${
-                canSend ? "bg-black hover:bg-black/90" : "bg-gray-400 cursor-not-allowed"
-              }`}
-            >
-              {isSending ? "전송 중..." : "피드백 전송"}
-            </button>
+            {sendError && <p className="mt-3 text-sm text-red-600">{sendError}</p>}
+            {sendSuccess && <p className="mt-3 text-sm text-green-600">{sendSuccess}</p>}
           </div>
+
+          {/* ── 현재 오디션 피드백 목록 ── */}
           {!isLoadingFeedbacks && feedbacks.length === 0 && !loadError && (
             <p className="mt-4 text-sm text-gray-500">아직 피드백이 없어요.</p>
           )}
+          {feedbacks.length > 0 && (
+            <ul className="mt-4 space-y-3">
+              {feedbacks.map((fb, idx) => {
+                const id = fb.id ?? idx;
+                const text = fb.textReview ?? "";
+                const reviewerName = fb.reviewer?.userName ?? fb.reviewer?.userNickname ?? "심사위원";
+                const isEditing = editingId === id;
 
-          
-{feedbacks.length > 0 && (
-  <ul className="mt-4 space-y-3">
-    {feedbacks.map((fb, idx) => {
-      const id = (fb as any).id as number;                 // <- fb.id로 바꾸면 더 좋음
-      const text = ((fb as any).textReview ?? "") as string;
+                return (
+                  <li key={id} className="group border border-gray-200 rounded-2xl p-4 bg-white">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <span className="font-bold text-gray-900">{reviewerName}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-400">{formatDateTime(fb.createdAt)}</span>
+                        {!isEditing && (
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={() => onClickEdit(fb)}
+                              disabled={isMutating}
+                              className="h-8 w-8 rounded-md hover:bg-gray-100 disabled:opacity-50"
+                              aria-label="수정"
+                              title="수정"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDeleteFeedback(fb)}
+                              disabled={isMutating}
+                              className="h-8 w-8 rounded-md hover:bg-red-50 disabled:opacity-50"
+                              aria-label="삭제"
+                              title="삭제"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-      const isEditing = editingId === id;
+                    {!isEditing ? (
+                      <p className="text-sm whitespace-pre-wrap break-words text-gray-700">{text}</p>
+                    ) : (
+                      <>
+                        <textarea
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          className="w-full min-h-[96px] p-2 border border-gray-300 rounded-lg resize-y bg-white text-sm"
+                        />
+                        <div className="mt-2 flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={onCancelEdit}
+                            disabled={isMutating}
+                            className="px-3 py-1.5 rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 text-sm"
+                          >
+                            취소
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onSaveEdit(fb)}
+                            disabled={isMutating || editingText.trim().length === 0}
+                            className="px-3 py-1.5 rounded-md bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 text-sm"
+                          >
+                            저장
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
-      return (
-        <li key={id ?? idx} className="border border-gray-200 rounded-lg p-4 bg-white">
-          <div className="flex items-start justify-between gap-3">
-            {/* 본문 / 수정 textarea */}
-            <div className="flex-1 min-w-0">
-              {!isEditing ? (
-                <p className="text-sm whitespace-pre-wrap break-words">{text}</p>
-              ) : (
-                <textarea
-                  value={editingText}
-                  onChange={(e) => setEditingText(e.target.value)}
-                  className="w-full min-h-[96px] p-2 border border-gray-300 rounded resize-y bg-white text-sm"
-                />
-              )}
-            </div>
-
-            {/* 우측 버튼들 */}
-              <div className="flex items-center gap-2 shrink-0">
-                {!isEditing ? (
-                  <>
-                    {/* 수정(연필) */}
-                    <button
-                      type="button"
-                      onClick={() => onClickEdit(fb)}
-                      disabled={isMutating}
-                      className="inline-flex items-center justify-center
-                                    h-9 w-9 rounded-md
-                                    bg-gray-100 text-gray-700
-                                    hover:bg-gray-200
-                                    disabled:opacity-50
-                                    border border-gray-200"
-                      aria-label="수정"
-                      title="수정"
-                    >
-                      ✏️
-                    </button>
-
-                    {/* 삭제(휴지통) */}
-                    <button
-                      type="button"
-                      onClick={() => onDeleteFeedback(fb)}
-                      disabled={isMutating}
-                      className="    inline-flex items-center justify-center
-                                      h-9 w-9 rounded-md
-                                      bg-gray-100 text-gray-600
-                                      hover:bg-red-50 hover:text-red-600
-                                      disabled:opacity-50
-                                      border border-gray-200"
-                      aria-label="삭제"
-                      title="삭제"
-                    >
-                      🗑️
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {/* 저장 */}
-                    <button
-                      type="button"
-                      onClick={() => onSaveEdit(fb)}
-                      disabled={isMutating || editingText.trim().length === 0}
-                      className="    inline-flex items-center justify-center
-                                      h-9 w-9 rounded-md
-                                      bg-gray-100 text-gray-700
-                                      hover:bg-gray-200
-                                      disabled:opacity-50
-                                      border border-gray-200"
-                      aria-label="저장"
-                      title="저장"
-                    >
-                      ✅
-                    </button>
-
-                    {/* 취소 */}
-                    <button
-                      type="button"
-                      onClick={onCancelEdit}
-                      disabled={isMutating}
-                      className="inline-flex items-center justify-center h-9 w-9 rounded-md
-                                bg-gray-200 text-gray-800 hover:bg-gray-300 disabled:opacity-50"
-                      aria-label="취소"
-                      title="취소"
-                    >
-                      ✖️
-                    </button>
-                  </>
-                )}
+          {/* ── 이전 오디션에서 받은 피드백 (타임라인) ── */}
+          {history.length > 0 && (
+            <div className="mt-8">
+              <div className="flex items-center gap-3 mb-4">
+                <h4 className="text-base font-semibold text-gray-900 shrink-0">
+                  이전 오디션에서 받은 피드백
+                </h4>
+                <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-xs shrink-0">
+                  {history.length}건
+                </span>
+                <div className="flex-1 h-px bg-gray-200" />
               </div>
-          </div>
-        </li>
-      );
-    })}
-  </ul>
-)}
-          {sendError && <p className="mt-3 text-sm text-red-600">{sendError}</p>}
-          {sendSuccess && <p className="mt-3 text-sm text-green-600">{sendSuccess}</p>}
-        </div>   
+
+              <ul className="relative space-y-3 before:absolute before:left-[3px] before:top-2 before:bottom-2 before:w-px before:bg-gray-200">
+                {history.map((fb, idx) => {
+                  const id = fb.id ?? idx;
+                  const text = fb.textReview ?? "";
+                  const reviewerName = fb.reviewer?.userName ?? fb.reviewer?.userNickname ?? "심사위원";
+
+                  return (
+                    <li key={id} className="relative pl-8">
+                      <span className="absolute left-0 top-3 h-2 w-2 rounded-full bg-white border-2 border-gray-300" />
+                      <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50">
+                        <div className="flex items-center justify-between gap-3 mb-1.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {fb.auditionTitle && (
+                              <span className="px-2 py-0.5 rounded-md bg-gray-200/70 text-gray-600 text-xs font-medium truncate max-w-[180px]">
+                                {fb.auditionTitle}
+                              </span>
+                            )}
+                            <span className="font-bold text-gray-900 truncate">{reviewerName}</span>
+                          </div>
+                          <span className="text-sm text-gray-400 shrink-0">{formatDateTime(fb.createdAt)}</span>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap break-words text-gray-700">{text}</p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
       </div>
     </div>
   );

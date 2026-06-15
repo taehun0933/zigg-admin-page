@@ -37,6 +37,7 @@ export const getAuditionInfo = async (body: {
   pageNum: number;
   filter: AuditionFilterType;
   name?: string;
+  desiredPosition?: string;
   size?: number;
 }): Promise<AuditionInfoType> => {
   try {
@@ -55,6 +56,10 @@ export const getAuditionInfo = async (body: {
 
     if (body.name) {
       params.name = body.name;
+    }
+
+    if (body.desiredPosition) {
+      params.desiredPosition = body.desiredPosition;
     }
 
     const response = await apiClient.get<AuditionInfoType>(

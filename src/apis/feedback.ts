@@ -33,6 +33,22 @@ export const getAuditionFeedbacks = async (
   }
 };
 
+// {{API_URL}}/admin/v0/auditions/{{auditionId}}/applications/{{applicationId}}/feedbacks/history
+// 같은 지원자에게 내가(현재 강사) 이전 오디션에서 남긴 피드백 (현재 지원서 제외)
+export const getApplicantFeedbackHistory = async (
+  auditionId: number,
+  applicationId: number
+): Promise<AuditionFeedbackList> => {
+  try {
+    const res = await apiClient.get<AuditionFeedbackList>(
+      `/auditions/${auditionId}/applications/${applicationId}/feedbacks/history`
+    );
+    return res.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
 export const deleteAuditionFeedback = async (
   auditionId: number,
   applicationId: number,

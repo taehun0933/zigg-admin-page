@@ -47,7 +47,9 @@ export interface AuditionFeedback {
   id: number;
   textReview: string;
   reviewer: User;
-  application: AuditionProfileType; 
+  application: AuditionProfileType;
+  auditionTitle?: string | null;
+  createdAt: string; // ISO string
 }
 
 export type AuditionFeedbackList = AuditionFeedback[];

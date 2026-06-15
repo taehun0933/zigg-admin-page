@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import {
   getAuditionFeedbacks,
   sendApplicationFeedback,
+  updateAuditionFeedback,
+  deleteAuditionFeedback,
 } from "@/apis/feedback";
 import { AuditionFeedback, AuditionProfileType } from "@/types/audition";
 import { countryNameKo } from "@/utils/countryName";
@@ -50,6 +52,9 @@ const ApplicantDetailModal: React.FC<Props> = ({
 }) => {
   const [feedbackText, setFeedbackText] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [feedbacks, setFeedbacks] = useState<AuditionFeedback[]>([]);
   const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +82,8 @@ const ApplicantDetailModal: React.FC<Props> = ({
     setError(null);
     setSuccess(null);
     setFeedbackText("");
+    setEditingId(null);
+    setEditingText("");
     refreshFeedbacks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applicant?.id]);
@@ -161,6 +168,62 @@ const ApplicantDetailModal: React.FC<Props> = ({
       setError(e?.message ?? "피드백 전송 중 오류가 발생했어요.");
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const onClickEdit = (fb: any) => {
+    setError(null);
+    setSuccess(null);
+    setEditingId(fb.id);
+    setEditingText(fb.textReview ?? "");
+  };
+
+  const onCancelEdit = () => {
+    setEditingId(null);
+    setEditingText("");
+  };
+
+  const onSaveEdit = async (feedbackId: number) => {
+    if (!editingText.trim() || isSavingEdit) return;
+    setError(null);
+    setSuccess(null);
+    setIsSavingEdit(true);
+    try {
+      await updateAuditionFeedback({
+        auditionId: a.auditionId,
+        applicationId: a.id,
+        feedbackId,
+        textReview: editingText.trim(),
+      });
+      setSuccess("피드백을 수정했어요.");
+      setEditingId(null);
+      setEditingText("");
+      await refreshFeedbacks();
+    } catch (e: any) {
+      setError(e?.message ?? "피드백 수정 중 오류가 발생했어요.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const onDeleteFeedback = async (feedbackId: number) => {
+    const ok = window.confirm(
+      "이 피드백을 삭제하시겠습니까?\n삭제 후에는 복구할 수 없습니다.",
+    );
+    if (!ok) return;
+    setError(null);
+    setSuccess(null);
+    try {
+      const status = await deleteAuditionFeedback(a.auditionId, a.id, feedbackId);
+      if (status >= 200 && status < 300) {
+        setSuccess("피드백을 삭제했어요.");
+        if (editingId === feedbackId) onCancelEdit();
+        await refreshFeedbacks();
+      } else {
+        setError("피드백 삭제에 실패했어요. 다시 시도해 주세요.");
+      }
+    } catch (e: any) {
+      setError(e?.message ?? "피드백 삭제 중 오류가 발생했어요.");
     }
   };
 
@@ -617,7 +680,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
                 ref={textareaRef}
                 value={feedbackText}
                 onChange={(e) => setFeedbackText(e.target.value)}
-                placeholder="지원자에게 전달할 피드백을 작성해주세요. 보낸 후에는 수정할 수 없습니다."
+                placeholder="지원자에게 전달할 피드백을 작성해주세요."
                 rows={4}
                 style={{
                   width: "100%",
@@ -732,7 +795,9 @@ const ApplicantDetailModal: React.FC<Props> = ({
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {feedbacks.map((fb: any) => (
+                {feedbacks.map((fb: any) => {
+                  const isEditing = editingId === fb.id;
+                  return (
                   <div
                     key={fb.id}
                     style={{
@@ -748,36 +813,128 @@ const ApplicantDetailModal: React.FC<Props> = ({
                         justifyContent: "space-between",
                         alignItems: "center",
                         marginBottom: 6,
+                        gap: 8,
                       }}
                     >
                       <span style={{ fontSize: 13, fontWeight: 700 }}>
                         {fb.reviewer?.userNickname ?? fb.reviewer?.userName ?? "관리자"}
                       </span>
-                      {fb.createdAt && (
-                        <span
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {fb.createdAt && (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: "var(--admin-ink-3)",
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            {formatDate(fb.createdAt)}
+                          </span>
+                        )}
+                        {!isEditing && (
+                          <div style={{ display: "flex", gap: 4 }}>
+                            <button
+                              onClick={() => onClickEdit(fb)}
+                              title="수정"
+                              style={cardActionBtn}
+                            >
+                              <AdminIcon name="edit" size={13} opacity={0.6} />
+                            </button>
+                            <button
+                              onClick={() => onDeleteFeedback(fb.id)}
+                              title="삭제"
+                              style={cardActionBtn}
+                            >
+                              <AdminIcon name="trashcan" size={13} opacity={0.6} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {isEditing ? (
+                      <>
+                        <textarea
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          rows={4}
+                          autoFocus
                           style={{
-                            fontSize: 11,
-                            color: "var(--admin-ink-3)",
-                            fontVariantNumeric: "tabular-nums",
+                            width: "100%",
+                            borderRadius: 10,
+                            border: "1px solid var(--admin-border)",
+                            padding: 12,
+                            fontSize: 13.5,
+                            fontFamily: "inherit",
+                            resize: "vertical",
+                            lineHeight: 1.55,
+                            outline: "none",
+                            background: "#fff",
+                            color: "var(--admin-ink)",
+                            minHeight: 80,
+                          }}
+                        />
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "flex-end",
+                            gap: 6,
+                            marginTop: 8,
                           }}
                         >
-                          {formatDate(fb.createdAt)}
-                        </span>
-                      )}
-                    </div>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: 13.5,
-                        lineHeight: 1.55,
-                        color: "var(--admin-ink)",
-                        whiteSpace: "pre-wrap",
-                      }}
-                    >
-                      {fb.textReview}
-                    </p>
+                          <button
+                            onClick={onCancelEdit}
+                            style={{
+                              height: 34,
+                              padding: "0 14px",
+                              borderRadius: 8,
+                              background: "#f3f3f6",
+                              color: "var(--admin-ink-2)",
+                              fontWeight: 600,
+                              fontSize: 12,
+                            }}
+                          >
+                            취소
+                          </button>
+                          <button
+                            onClick={() => onSaveEdit(fb.id)}
+                            disabled={!editingText.trim() || isSavingEdit}
+                            style={{
+                              height: 34,
+                              padding: "0 14px",
+                              borderRadius: 8,
+                              background:
+                                editingText.trim() && !isSavingEdit
+                                  ? "var(--admin-blue)"
+                                  : "#c8d6f0",
+                              color: "#fff",
+                              fontWeight: 600,
+                              fontSize: 12,
+                              cursor:
+                                editingText.trim() && !isSavingEdit
+                                  ? "pointer"
+                                  : "not-allowed",
+                            }}
+                          >
+                            {isSavingEdit ? "저장 중…" : "저장"}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 13.5,
+                          lineHeight: 1.55,
+                          color: "var(--admin-ink)",
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        {fb.textReview}
+                      </p>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Section>
@@ -785,6 +942,17 @@ const ApplicantDetailModal: React.FC<Props> = ({
       </div>
     </div>
   );
+};
+
+const cardActionBtn: React.CSSProperties = {
+  width: 28,
+  height: 28,
+  borderRadius: 8,
+  background: "#f7f7fa",
+  border: "1px solid var(--admin-border)",
+  display: "grid",
+  placeItems: "center",
+  cursor: "pointer",
 };
 
 const navBtn: React.CSSProperties = {

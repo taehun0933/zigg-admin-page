@@ -38,6 +38,16 @@ const FILTERS: FilterOpt[] = [
 
 const CHIP_COLORS = ["#007aff", "#2dbd6f", "#cc7a00", "#c0337a", "#6b3ec9", "#1a1a1f"];
 
+// 포지션 필터 — 지원서(client-reactNative AuditionApplicationScreen)에서
+// desiredPosition 은 Vocal/Dance/Rap 3개 고정 영문값만 전송된다. 서버에서 필터링.
+type PosKey = "all" | "Vocal" | "Dance" | "Rap";
+const POSITIONS: { id: PosKey; label: string }[] = [
+  { id: "all", label: "전체 포지션" },
+  { id: "Vocal", label: "보컬" },
+  { id: "Dance", label: "댄스" },
+  { id: "Rap", label: "랩" },
+];
+
 type RailTab = "scrap" | "like";
 
 const AuditionDetailPage: React.FC = () => {
@@ -56,6 +66,7 @@ const AuditionDetailPage: React.FC = () => {
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<AuditionFilterType>("all");
+  const [posFilter, setPosFilter] = useState<PosKey>("all");
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [scrollPct, setScrollPct] = useState(0);
@@ -109,6 +120,7 @@ const AuditionDetailPage: React.FC = () => {
           pageNum: page,
           filter,
           name: debouncedQuery || undefined,
+          desiredPosition: posFilter === "all" ? undefined : posFilter,
         });
         if (reqId !== lastReqRef.current) return;
         setTotalPages(data.totalPages);
@@ -122,7 +134,7 @@ const AuditionDetailPage: React.FC = () => {
         fetchingRef.current = false;
       }
     },
-    [id, filter, debouncedQuery],
+    [id, filter, debouncedQuery, posFilter],
   );
 
   // reset + fetch on filter/query/id change
@@ -135,7 +147,7 @@ const AuditionDetailPage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: "auto" });
     fetchPage(0, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, id, filter, debouncedQuery]);
+  }, [ready, id, filter, debouncedQuery, posFilter]);
 
   // rail data fetch (DB)
   const fetchRailLists = useCallback(async () => {
@@ -306,6 +318,7 @@ const AuditionDetailPage: React.FC = () => {
             pageNum: page,
             filter,
             name: debouncedQuery || undefined,
+            desiredPosition: posFilter === "all" ? undefined : posFilter,
           });
           pages = data.totalPages;
           setTotalPages(data.totalPages);
@@ -323,7 +336,7 @@ const AuditionDetailPage: React.FC = () => {
         loadingTargetRef.current = false;
       }
     },
-    [pageNum, totalPages, id, filter, debouncedQuery],
+    [pageNum, totalPages, id, filter, debouncedQuery, posFilter],
   );
 
   // scrollTarget이 content에 등장하면 스크롤하고 타깃 해제
@@ -544,6 +557,39 @@ const AuditionDetailPage: React.FC = () => {
                   })}
                 </div>
                 <div style={{ width: 1, height: 22, background: "var(--admin-border)" }} />
+                {/* 포지션 필터 (보컬/댄스/랩) — 로드된 목록 기준 클라이언트 필터 */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 4,
+                    padding: 3,
+                    background: "#f3f3f6",
+                    borderRadius: 9,
+                  }}
+                >
+                  {POSITIONS.map((o) => {
+                    const active = posFilter === o.id;
+                    return (
+                      <button
+                        key={o.id}
+                        onClick={() => setPosFilter(o.id)}
+                        style={{
+                          height: 28,
+                          padding: "0 12px",
+                          borderRadius: 6,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          background: active ? "#fff" : "transparent",
+                          color: active ? "var(--admin-ink)" : "var(--admin-ink-2)",
+                          boxShadow: active ? "0 1px 2px rgba(0,0,0,.06)" : "none",
+                        }}
+                      >
+                        {o.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ width: 1, height: 22, background: "var(--admin-border)" }} />
                 <span style={{ fontSize: 12, color: "var(--admin-ink-2)" }}>
                   <strong
                     style={{ color: "var(--admin-ink)", fontVariantNumeric: "tabular-nums" }}
@@ -615,7 +661,9 @@ const AuditionDetailPage: React.FC = () => {
             )}
             {!loading && pageNum + 1 >= totalPages && content.length > 0 && (
               <div style={{ display: "flex", justifyContent: "center", padding: 40, color: "var(--admin-ink-3)", fontSize: 13 }}>
-                마지막 지원자입니다 · 총 {nfmt(totalElements)}명
+                {posFilter === "all"
+                  ? `마지막 지원자입니다 · 총 ${nfmt(totalElements)}명`
+                  : `${POSITIONS.find((p) => p.id === posFilter)?.label} ${nfmt(totalElements)}명`}
               </div>
             )}
             {!loading && content.length === 0 && (

@@ -17,6 +17,8 @@ import { formatYmdHm } from "@/utils/common";
 import { Pagination } from "@mui/material";
 
 const PAGE_SIZE = 20;
+// 답변여부 필터 API가 없어 전체를 받아 클라이언트에서 탭 필터 + 페이지네이션
+const FETCH_SIZE = 200;
 
 type Tab = "open" | "done";
 
@@ -25,7 +27,6 @@ const CustomerInquiryPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState<CustomerInquiryDetailType[]>([]);
-  const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
   const [tab, setTab] = useState<Tab>("open");
 
@@ -34,17 +35,16 @@ const CustomerInquiryPage: React.FC = () => {
   const [replySending, setReplySending] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
 
-  const fetchMessages = useCallback(async (page: number) => {
+  const fetchMessages = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await getCustomerInquiryMessages({
-        page: page - 1,
-        size: PAGE_SIZE,
+        page: 0,
+        size: FETCH_SIZE,
         sort: "createAt,desc",
       });
       setContent(data.content);
-      setTotalPages(data.totalPages);
     } catch (e) {
       console.error(e);
       setError("문의 목록을 불러오지 못했어요.");
@@ -56,8 +56,13 @@ const CustomerInquiryPage: React.FC = () => {
 
   useEffect(() => {
     if (!ready) return;
-    fetchMessages(currentPage);
-  }, [ready, currentPage, fetchMessages]);
+    fetchMessages();
+  }, [ready, fetchMessages]);
+
+  // 탭 전환 시 1페이지로 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tab]);
 
   const counts = useMemo(() => {
     const open = content.filter((c) => c.replies.length === 0).length;
@@ -68,6 +73,12 @@ const CustomerInquiryPage: React.FC = () => {
   const filtered = useMemo(
     () => content.filter((c) => (tab === "open" ? c.replies.length === 0 : c.replies.length >= 1)),
     [content, tab],
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageItems = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage],
   );
 
   const handleSendReply = async () => {
@@ -169,7 +180,7 @@ const CustomerInquiryPage: React.FC = () => {
           {!loading && error && (
             <div style={{ padding: 40, textAlign: "center", color: "#cc3333", fontSize: 13 }}>{error}</div>
           )}
-          {!loading && !error && filtered.length === 0 && (
+          {!loading && !error && pageItems.length === 0 && (
             <div style={{ padding: 40, textAlign: "center", color: "var(--admin-ink-3)", fontSize: 13 }}>
               표시할 항목이 없어요.
             </div>
@@ -177,7 +188,7 @@ const CustomerInquiryPage: React.FC = () => {
 
           {!loading &&
             !error &&
-            filtered.map((v, i) => (
+            pageItems.map((v, i) => (
               <div
                 key={v.id}
                 onClick={() => {

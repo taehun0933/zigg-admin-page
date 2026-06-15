@@ -806,7 +806,7 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({ applicant, idx, onClick, 
         >
           #{idx}
         </span>
-        {!applicant.acceptFeedback && (
+        {applicant.acceptFeedback && (
           <span
             style={{
               position: "absolute",
@@ -816,11 +816,11 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({ applicant, idx, onClick, 
               fontWeight: 700,
               padding: "3px 7px",
               borderRadius: 999,
-              background: "#ffe9e9",
-              color: "#cc3333",
+              background: "#e6f7ec",
+              color: "#1f9d57",
             }}
           >
-            피드백 X
+            피드백 O
           </span>
         )}
         <div style={{ position: "absolute", bottom: 8, right: 8, display: "flex", gap: 6 }}>

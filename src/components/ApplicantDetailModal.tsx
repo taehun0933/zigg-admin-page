@@ -233,6 +233,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
       role="dialog"
       aria-modal="true"
       onClick={onClose}
+      className="ad-overlay"
       style={{
         position: "fixed",
         inset: 0,
@@ -249,6 +250,17 @@ const ApplicantDetailModal: React.FC<Props> = ({
       <style>{`
         @keyframes detailFadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes detailSlideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        @media (max-width: 768px) {
+          .ad-overlay { padding: 16px 10px !important; }
+          .ad-body { padding: 14px !important; gap: 12px !important; }
+          .ad-row1 { grid-template-columns: 1fr !important; }
+          .ad-profile-card { max-width: 460px; margin-left: auto; margin-right: auto; width: 100%; }
+          .ad-profile-photo { width: 62% !important; max-width: 240px; }
+        }
+        @media (max-width: 420px) {
+          .ad-profile-card { padding: 18px !important; }
+          .ad-meta-row { grid-template-columns: 18px 74px 1fr !important; gap: 8px !important; }
+        }
       `}</style>
       <div
         onClick={(e) => e.stopPropagation()}
@@ -374,11 +386,12 @@ const ApplicantDetailModal: React.FC<Props> = ({
         </header>
 
         {/* Body */}
-        <div style={{ padding: 22, display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="ad-body" style={{ padding: 22, display: "flex", flexDirection: "column", gap: 14 }}>
           {/* Row 1: profile + intro/video */}
-          <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 14 }}>
+          <div className="ad-row1" style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 14 }}>
             {/* Profile Card */}
             <div
+              className="ad-profile-card"
               style={{
                 background: "#fff",
                 border: "1px solid var(--admin-border)",
@@ -391,6 +404,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
               }}
             >
               <div
+                className="ad-profile-photo"
                 style={{
                   width: 140,
                   aspectRatio: "1 / 1.1",
@@ -1004,6 +1018,7 @@ const MetaRow: React.FC<{ icon: string; label: string; children: React.ReactNode
   children,
 }) => (
   <div
+    className="ad-meta-row"
     style={{
       display: "grid",
       gridTemplateColumns: "20px 90px 1fr",

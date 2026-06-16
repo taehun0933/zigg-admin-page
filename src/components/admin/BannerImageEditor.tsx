@@ -102,7 +102,6 @@ const BannerImageEditor: React.FC<Props> = ({
       // 가장자리 색 자동 추출 → 기본 배경색
       const edge = detectEdgeColor(image);
       setBgColor(edge);
-      setTainted(edge === "#ffffff" && typeof source === "string"); // 원격이면서 추출 실패 추정
       setLoading(false);
     };
     image.onload = onload;
@@ -111,8 +110,9 @@ const BannerImageEditor: React.FC<Props> = ({
       alert("이미지를 불러오지 못했습니다.");
     };
     if (typeof source === "string") {
+      // 원격 이미지는 same-origin 프록시를 통해 로드 → canvas 오염 방지
       image.crossOrigin = "anonymous";
-      image.src = source;
+      image.src = `/api/image-proxy?url=${encodeURIComponent(source)}`;
     } else {
       objectUrl = URL.createObjectURL(source);
       image.src = objectUrl;

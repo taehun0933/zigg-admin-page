@@ -490,7 +490,9 @@ const AuditionDetailPage: React.FC = () => {
                 style={{
                   display: "flex",
                   alignItems: "center",
+                  flexWrap: "wrap",
                   gap: 10,
+                  rowGap: 8,
                   padding: "12px 14px",
                   background: "#fff",
                   border: "1px solid var(--admin-border)",
@@ -503,8 +505,8 @@ const AuditionDetailPage: React.FC = () => {
                     display: "flex",
                     alignItems: "center",
                     gap: 8,
-                    flex: 1,
-                    minWidth: 240,
+                    flex: "1 1 200px",
+                    minWidth: 180,
                     height: 34,
                     padding: "0 12px",
                     background: "#f3f3f6",
@@ -532,6 +534,7 @@ const AuditionDetailPage: React.FC = () => {
                     padding: 3,
                     background: "#f3f3f6",
                     borderRadius: 9,
+                    flexShrink: 0,
                   }}
                 >
                   {FILTERS.map((o) => {
@@ -546,6 +549,7 @@ const AuditionDetailPage: React.FC = () => {
                           borderRadius: 6,
                           fontSize: 12,
                           fontWeight: 600,
+                          whiteSpace: "nowrap",
                           background: active ? "#fff" : "transparent",
                           color: active ? "var(--admin-ink)" : "var(--admin-ink-2)",
                           boxShadow: active ? "0 1px 2px rgba(0,0,0,.06)" : "none",
@@ -565,6 +569,7 @@ const AuditionDetailPage: React.FC = () => {
                     padding: 3,
                     background: "#f3f3f6",
                     borderRadius: 9,
+                    flexShrink: 0,
                   }}
                 >
                   {POSITIONS.map((o) => {
@@ -579,6 +584,7 @@ const AuditionDetailPage: React.FC = () => {
                           borderRadius: 6,
                           fontSize: 12,
                           fontWeight: 600,
+                          whiteSpace: "nowrap",
                           background: active ? "#fff" : "transparent",
                           color: active ? "var(--admin-ink)" : "var(--admin-ink-2)",
                           boxShadow: active ? "0 1px 2px rgba(0,0,0,.06)" : "none",
@@ -590,7 +596,7 @@ const AuditionDetailPage: React.FC = () => {
                   })}
                 </div>
                 <div style={{ width: 1, height: 22, background: "var(--admin-border)" }} />
-                <span style={{ fontSize: 12, color: "var(--admin-ink-2)" }}>
+                <span style={{ fontSize: 12, color: "var(--admin-ink-2)", whiteSpace: "nowrap" }}>
                   <strong
                     style={{ color: "var(--admin-ink)", fontVariantNumeric: "tabular-nums" }}
                   >

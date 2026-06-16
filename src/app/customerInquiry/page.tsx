@@ -115,6 +115,9 @@ const CustomerInquiryPage: React.FC = () => {
         <div
           style={{
             display: "inline-flex",
+            flexWrap: "nowrap",
+            maxWidth: "100%",
+            overflowX: "auto",
             gap: 4,
             padding: 3,
             background: "#f3f3f6",
@@ -139,6 +142,8 @@ const CustomerInquiryPage: React.FC = () => {
                   borderRadius: 6,
                   fontSize: 13,
                   fontWeight: 600,
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
                   background: active ? "#fff" : "transparent",
                   color: active ? "var(--admin-ink)" : "var(--admin-ink-2)",
                   boxShadow: active ? "0 1px 2px rgba(0,0,0,.06)" : "none",

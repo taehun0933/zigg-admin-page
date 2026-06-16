@@ -182,6 +182,9 @@ const TrainerPage: React.FC = () => {
           <div
             style={{
               display: "inline-flex",
+              flexWrap: "nowrap",
+              maxWidth: "100%",
+              overflowX: "auto",
               gap: 4,
               padding: 3,
               background: "#f3f3f6",
@@ -201,6 +204,8 @@ const TrainerPage: React.FC = () => {
                     borderRadius: 6,
                     fontSize: 13,
                     fontWeight: 600,
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 7,

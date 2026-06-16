@@ -105,7 +105,8 @@ const BoardPage: React.FC = () => {
           })}
         </div>
 
-        <div style={{ ...adminCardStyle, overflow: "hidden" }}>
+        <div className="zg-table-scroll" style={{ ...adminCardStyle }}>
+          <div className="zg-table-inner">
           <div
             style={{
               display: "grid",
@@ -187,6 +188,7 @@ const BoardPage: React.FC = () => {
               </div>
             ))
           )}
+          </div>
         </div>
       </PageShell>
     </AdminShell>

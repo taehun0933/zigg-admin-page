@@ -139,7 +139,7 @@ const NotificationPage: React.FC = () => {
         title="유저 알림 발송"
         subtitle="전체 유저에게 푸시 + 인앱 알림을 동시에 발송합니다."
       >
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 14 }}>
+        <div className="zg-split" style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 14 }}>
           <div style={{ ...adminCardStyle, padding: 22 }}>
             {/* mode segmented */}
             <Field label="발송 종류">
@@ -454,11 +454,14 @@ const NotificationPage: React.FC = () => {
           }}
         >
           <div
+            className="zg-modal-card"
             style={{
               background: "#fff",
               borderRadius: 16,
               padding: 24,
               width: 420,
+              maxHeight: "calc(100vh - 32px)",
+              overflowY: "auto",
               display: "flex",
               flexDirection: "column",
               gap: 14,

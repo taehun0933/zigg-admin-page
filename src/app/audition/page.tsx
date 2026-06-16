@@ -322,11 +322,11 @@ const AuditionPage: React.FC = () => {
         title="오디션 생성"
         sizeMode="LARGE"
       >
-        <div style={{ display: "flex", gap: 32 }}>
+        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 16 : 32 }}>
           <div
             style={{
               flex: 1,
-              minHeight: 320,
+              minHeight: isMobile ? 200 : 320,
               background: "#f3f3f6",
               borderRadius: 12,
               display: "grid",

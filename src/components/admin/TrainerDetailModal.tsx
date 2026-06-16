@@ -193,6 +193,7 @@ const TrainerDetailModal: React.FC<Props> = ({
 
         {/* body */}
         <div
+          className="zg-split"
           style={{
             padding: 22,
             display: "grid",

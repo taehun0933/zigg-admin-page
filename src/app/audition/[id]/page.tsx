@@ -22,7 +22,6 @@ import { countryNameKo } from "@/utils/countryName";
 import { Audition } from "@/app/audition/page";
 
 const nfmt = (n: number) => n.toLocaleString("ko-KR");
-const GROUP_SIZE = 10;
 // Sticky 영역 합산(탑바 60 + 칩/필터 sticky 약 132). 스크롤 점프·인덱스 계산 시 사용.
 const STICKY_OFFSET = 200;
 
@@ -224,18 +223,6 @@ const AuditionDetailPage: React.FC = () => {
       if (raf) cancelAnimationFrame(raf);
     };
   }, [pageNum, totalPages, fetchPage]);
-
-  const groups = useMemo(() => {
-    const out: { start: number; end: number; items: AuditionProfileType[] }[] = [];
-    for (let i = 0; i < content.length; i += GROUP_SIZE) {
-      out.push({
-        start: i + 1,
-        end: Math.min(i + GROUP_SIZE, content.length),
-        items: content.slice(i, i + GROUP_SIZE),
-      });
-    }
-    return out;
-  }, [content]);
 
   const patchContent = (appId: number, patch: Partial<AuditionProfileType>) => {
     setContent((prev) => prev.map((p) => (p.id === appId ? { ...p, ...patch } : p)));
@@ -639,56 +626,36 @@ const AuditionDetailPage: React.FC = () => {
               width: "100%",
             }}
           >
-            {groups.map((g) => (
-              <div key={g.start}>
-                <div style={{ padding: "12px 0", display: "flex", alignItems: "center", gap: 12 }}>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "#fff",
-                      background: "#1a1a1f",
-                      padding: "4px 10px",
-                      borderRadius: 999,
-                      fontVariantNumeric: "tabular-nums",
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                gap: 14,
+                paddingTop: 12,
+                paddingBottom: 16,
+              }}
+            >
+              {content.map((a, i) => {
+                const idx = i + 1;
+                return (
+                  <div
+                    key={a.id}
+                    ref={(el) => {
+                      if (el) cardRefs.current[idx] = el;
                     }}
+                    style={{ scrollMarginTop: STICKY_OFFSET }}
                   >
-                    #{g.start} – #{g.end}
-                  </span>
-                  <span style={{ fontSize: 13, color: "var(--admin-ink-2)" }}>{g.items.length}명</span>
-                  <div style={{ flex: 1, height: 1, background: "var(--admin-border)" }} />
-                </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                    gap: 14,
-                    paddingBottom: 16,
-                  }}
-                >
-                  {g.items.map((a, i) => {
-                    const idx = g.start + i;
-                    return (
-                      <div
-                        key={a.id}
-                        ref={(el) => {
-                          if (el) cardRefs.current[idx] = el;
-                        }}
-                        style={{ scrollMarginTop: STICKY_OFFSET }}
-                      >
-                        <ApplicantCard
-                          applicant={a}
-                          idx={idx}
-                          onClick={() => setSelected(a)}
-                          onScrap={() => toggleScrap(a)}
-                          onLike={() => toggleLike(a)}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+                    <ApplicantCard
+                      applicant={a}
+                      idx={idx}
+                      onClick={() => setSelected(a)}
+                      onScrap={() => toggleScrap(a)}
+                      onLike={() => toggleLike(a)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
             {loading && (
               <div style={{ display: "flex", justifyContent: "center", padding: 40, color: "var(--admin-ink-3)", fontSize: 13 }}>
                 불러오는 중…

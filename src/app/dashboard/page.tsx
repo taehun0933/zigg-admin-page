@@ -386,6 +386,7 @@ const DashboardPage: React.FC = () => {
       >
         {/* KPI grid */}
         <div
+          className="zg-grid-4"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(4, 1fr)",
@@ -423,6 +424,7 @@ const DashboardPage: React.FC = () => {
 
         {/* Charts row */}
         <div
+          className="zg-split-2-1"
           style={{
             display: "grid",
             gridTemplateColumns: "2fr 1fr",
@@ -585,6 +587,7 @@ const DashboardPage: React.FC = () => {
           <span style={{ fontSize: 12, color: "var(--admin-ink-3)" }}>자주 쓰는 운영 메뉴</span>
         </div>
         <div
+          className="zg-grid-3"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(3, 1fr)",

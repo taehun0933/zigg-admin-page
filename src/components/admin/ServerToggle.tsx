@@ -129,7 +129,9 @@ const ServerToggle: React.FC<ServerToggleProps> = ({ compact = false }) => {
           }}
         >
           <div
+            className="zg-modal-card"
             style={{
+              ["--zg-modal-w" as string]: "360px",
               background: "#fff",
               borderRadius: 16,
               padding: 24,
@@ -138,7 +140,7 @@ const ServerToggle: React.FC<ServerToggleProps> = ({ compact = false }) => {
               flexDirection: "column",
               gap: 14,
               boxShadow: "0 12px 32px rgba(0,0,0,.18)",
-            }}
+            } as React.CSSProperties}
           >
             <div style={{ fontSize: 15, lineHeight: 1.55, color: "var(--admin-ink)" }}>
               <strong style={{ color: pending === "prod" ? "var(--admin-good)" : "var(--admin-warn)" }}>

@@ -38,7 +38,8 @@ const NoticePage: React.FC = () => {
           </button>
         }
       >
-        <div style={{ ...adminCardStyle, overflow: "hidden" }}>
+        <div className="zg-table-scroll" style={{ ...adminCardStyle }}>
+          <div className="zg-table-inner">
           <div
             style={{
               display: "grid",
@@ -142,6 +143,7 @@ const NoticePage: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
         </div>
       </PageShell>
     </AdminShell>

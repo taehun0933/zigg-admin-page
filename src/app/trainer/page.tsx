@@ -275,6 +275,7 @@ const TrainerPage: React.FC = () => {
           </div>
         ) : (
           <div
+            className="zg-grid-5"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(5, 1fr)",

@@ -102,7 +102,7 @@ const TicketPage: React.FC = () => {
         title="유저에게 티켓 직접 지급"
         subtitle="결제 오류·이벤트 보상 등의 경우 닉네임으로 티켓을 지급합니다."
       >
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <div className="zg-split" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           {/* New grant */}
           <div style={{ ...adminCardStyle, padding: 22 }}>
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>새 지급</div>

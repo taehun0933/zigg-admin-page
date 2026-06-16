@@ -6,6 +6,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import PageShell, { adminCardStyle, btnPrimary } from "@/components/admin/PageShell";
 import AdminIcon from "@/components/admin/AdminIcon";
 import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
+import { useIsMobile } from "@/components/admin/useIsMobile";
 import { getAuditions, postNewAudition } from "@/apis/audition";
 import { getUrlForUploadImage, putImageToPresignedUrl } from "@/apis/media";
 import Modal from "@/components/Modal";
@@ -38,6 +39,7 @@ const nfmt = (n: number) => n.toLocaleString("ko-KR");
 const AuditionPage: React.FC = () => {
   const router = useRouter();
   const ready = useAdminAuthGuard();
+  const isMobile = useIsMobile();
 
   const [auditions, setAuditions] = useState<Audition[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -231,7 +233,9 @@ const AuditionPage: React.FC = () => {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                    gridTemplateColumns: isMobile
+                      ? "repeat(2, minmax(0, 1fr))"
+                      : "repeat(auto-fill, minmax(260px, 1fr))",
                     gap: 14,
                   }}
                 >
@@ -295,7 +299,9 @@ const AuditionPage: React.FC = () => {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                    gridTemplateColumns: isMobile
+                      ? "repeat(2, minmax(0, 1fr))"
+                      : "repeat(auto-fill, minmax(260px, 1fr))",
                     gap: 14,
                   }}
                 >

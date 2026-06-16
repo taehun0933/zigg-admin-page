@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import AdminIcon from "./AdminIcon";
 import ServerToggle from "./ServerToggle";
 import { useUnansweredInquiryCount } from "./useUnansweredInquiryCount";
+import { usePendingTrainerCount } from "./usePendingTrainerCount";
 
 interface NavItem {
   id: string;
@@ -40,6 +41,7 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
 
   const [collapsed, setCollapsed] = useState(false);
   const unansweredCount = useUnansweredInquiryCount();
+  const trainerPendingCount = usePendingTrainerCount();
 
   useEffect(() => {
     const stored = localStorage.getItem(SIDEBAR_KEY);
@@ -164,6 +166,14 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
           )}
           {NAV.map((item) => {
             const active = item.id === current.id;
+            const badgeCount =
+              item.id === "voices"
+                ? unansweredCount
+                : item.id === "trainers"
+                ? trainerPendingCount
+                : 0;
+            const badgeTitle =
+              item.id === "trainers" ? `승인 대기 ${badgeCount}건` : `미응답 ${badgeCount}건`;
             return (
               <button
                 key={item.id}
@@ -209,9 +219,9 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
                     size={20}
                     opacity={active ? 1 : 0.7}
                   />
-                  {item.id === "voices" && unansweredCount > 0 && collapsed && (
+                  {badgeCount > 0 && collapsed && (
                     <span
-                      title={`미응답 ${unansweredCount}건`}
+                      title={badgeTitle}
                       style={{
                         position: "absolute",
                         top: -3,
@@ -231,16 +241,16 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
                         lineHeight: 1,
                       }}
                     >
-                      {unansweredCount > 99 ? "99+" : unansweredCount}
+                      {badgeCount > 99 ? "99+" : badgeCount}
                     </span>
                   )}
                 </span>
                 {!collapsed && (
                   <>
                     <span>{item.label}</span>
-                    {item.id === "voices" && unansweredCount > 0 && (
+                    {badgeCount > 0 && (
                       <span
-                        title={`미응답 ${unansweredCount}건`}
+                        title={badgeTitle}
                         style={{
                           marginLeft: "auto",
                           minWidth: 20,
@@ -258,7 +268,7 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
                           lineHeight: 1,
                         }}
                       >
-                        {unansweredCount > 99 ? "99+" : unansweredCount}
+                        {badgeCount > 99 ? "99+" : badgeCount}
                       </span>
                     )}
                   </>

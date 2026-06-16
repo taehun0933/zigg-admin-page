@@ -278,6 +278,7 @@ const TrainerPage: React.FC = () => {
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(5, 1fr)",
+              gridAutoRows: "1fr",
               gap: 14,
             }}
           >
@@ -334,6 +335,7 @@ function TrainerCard({
         border: "1px solid var(--admin-border)",
         borderRadius: 16,
         padding: 12,
+        height: "100%",
         display: "flex",
         flexDirection: "column",
         gap: 11,
@@ -360,9 +362,7 @@ function TrainerCard({
           position: "relative",
           overflow: "hidden",
           background: "#eceef2",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          flexShrink: 0,
         }}
       >
         {cover ? (
@@ -370,10 +370,25 @@ function TrainerCard({
           <img
             src={cover}
             alt=""
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
           />
         ) : (
-          <AdminIcon name="person" size={34} opacity={0.4} />
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "grid",
+              placeItems: "center",
+            }}
+          >
+            <AdminIcon name="person" size={34} opacity={0.4} />
+          </div>
         )}
         <span style={{ position: "absolute", top: 8, right: 8 }}>
           <StatusChip status={application.status} />
@@ -425,6 +440,9 @@ function TrainerCard({
             fontSize: 12,
             color: "var(--admin-ink-3)",
             fontVariantNumeric: "tabular-nums",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
           신청일 {date}

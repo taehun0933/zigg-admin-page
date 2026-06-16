@@ -87,7 +87,10 @@ export const btnPrimary: React.CSSProperties = {
   fontSize: 13,
   display: "inline-flex",
   alignItems: "center",
+  justifyContent: "center",
   gap: 6,
+  whiteSpace: "nowrap",
+  flexShrink: 0,
 };
 
 export const btnSecondary: React.CSSProperties = {
@@ -101,7 +104,10 @@ export const btnSecondary: React.CSSProperties = {
   fontSize: 13,
   display: "inline-flex",
   alignItems: "center",
+  justifyContent: "center",
   gap: 6,
+  whiteSpace: "nowrap",
+  flexShrink: 0,
 };
 
 export const inputStyle: React.CSSProperties = {

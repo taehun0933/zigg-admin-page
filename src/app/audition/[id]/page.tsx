@@ -404,7 +404,7 @@ const AuditionDetailPage: React.FC = () => {
                   )}
                 </p>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                 <button style={btnSecondary} onClick={() => router.push("/audition")}>
                   ← 목록
                 </button>
@@ -632,7 +632,7 @@ const AuditionDetailPage: React.FC = () => {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
                     gap: 14,
                     paddingBottom: 16,
                   }}

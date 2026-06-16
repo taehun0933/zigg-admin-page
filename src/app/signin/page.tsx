@@ -12,6 +12,7 @@ export default function SignInPage() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -21,13 +22,30 @@ export default function SignInPage() {
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
+    setPending(null);
     setSubmitting(true);
     try {
       await authService.login(form.email, form.password);
       setIsLoggedIn(true);
       router.push("/dashboard");
-    } catch {
-      setError("아이디 또는 비밀번호가 잘못되었습니다.");
+    } catch (err) {
+      const status = (err as { status?: number })?.status;
+      const data = (err as { message?: unknown })?.message;
+      const serverMsg =
+        typeof data === "object" && data !== null
+          ? (data as { message?: string }).message
+          : typeof data === "string"
+          ? data
+          : undefined;
+      if (status === 409) {
+        // 트레이너 승인 대기
+        setPending(serverMsg ?? "현재 승인 중입니다. 관리자 승인 후 로그인할 수 있어요.");
+      } else if (status === 403) {
+        // 트레이너 신청 반려
+        setError(serverMsg ?? "트레이너 신청이 반려되었습니다. 다시 신청해주세요.");
+      } else {
+        setError("아이디 또는 비밀번호가 잘못되었습니다.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -121,7 +139,7 @@ export default function SignInPage() {
               ZIGG 관리자 페이지
             </h1>
             <p style={{ fontSize: 13, color: "var(--admin-ink-2)", margin: "6px 0 0" }}>
-              운영자 계정으로 로그인하세요.
+              트레이너 또는 관리자 이메일·비밀번호로 로그인하세요.
             </p>
           </div>
 
@@ -169,6 +187,36 @@ export default function SignInPage() {
               </div>
             )}
 
+            {pending && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 9,
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  background: "var(--admin-warn-tint)",
+                  color: "#b06a00",
+                  border: "1px solid #f4dcae",
+                  fontSize: 12.5,
+                  lineHeight: 1.55,
+                  fontWeight: 600,
+                }}
+              >
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: "var(--admin-warn)",
+                    flexShrink: 0,
+                    marginTop: 5,
+                  }}
+                />
+                <span>{pending}</span>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={submitting}
@@ -190,15 +238,39 @@ export default function SignInPage() {
 
           <div
             style={{
-              marginTop: 20,
+              marginTop: 16,
               paddingTop: 16,
               borderTop: "1px solid var(--admin-border)",
+              textAlign: "center",
+            }}
+          >
+            <span style={{ fontSize: 13, color: "var(--admin-ink-2)" }}>
+              트레이너로 활동하시려면?{" "}
+            </span>
+            <button
+              type="button"
+              onClick={() => router.push("/trainer/apply")}
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: "var(--admin-blue)",
+                background: "transparent",
+                cursor: "pointer",
+              }}
+            >
+              트레이너 발급 신청하기 ›
+            </button>
+          </div>
+
+          <div
+            style={{
+              marginTop: 14,
               fontSize: 11,
               color: "var(--admin-ink-3)",
               lineHeight: 1.5,
             }}
           >
-            상단 우측 토글로 Dev / Prod 서버를 전환할 수 있습니다. 환경에 맞는 계정으로 로그인해주세요.
+            트레이너 계정은 관리자 승인 후 로그인할 수 있어요. 상단 우측 토글로 Dev / Prod 서버를 전환할 수 있습니다.
           </div>
         </div>
       </main>

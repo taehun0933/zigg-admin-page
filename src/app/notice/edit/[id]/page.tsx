@@ -16,6 +16,7 @@ import {
 import { requestImagePresignedUrl, requestVideoPresignedUrl } from "@/apis/media";
 import { putFileToPresignedUrl } from "@/apis/board";
 import { getVideoDurationSec, getFileExtension, formatHms } from "@/utils/media";
+import BannerImageEditor from "@/components/admin/BannerImageEditor";
 
 // 배너 규격
 const BANNER_ASPECT = 9 / 5.16;
@@ -100,6 +101,10 @@ export default function NoticeEditPage(){
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const [layout, setLayout] = useState<NoticeLayout | null>(null);
 
+  // 배너 이미지 편집기
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorSource, setEditorSource] = useState<File | string | null>(null);
+
   // 공통 값
   const [priority, setPriority] = useState<number>(10);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null); // 이미 저장된 배너 URL (이미 있으면 표시)
@@ -167,28 +172,35 @@ export default function NoticeEditPage(){
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openFilePicker = () => fileInputRef.current?.click();
 
-  // 공통 배너 업로드 핸들러
-// 공통 배너 업로드 핸들러
-const onPickBanner: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
-    const inputEl = e.currentTarget;                 // ← 캐싱
+  // 파일 선택 → 편집기 오픈 (비율/배경 편집 후 업로드)
+  const onPickBanner: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const inputEl = e.currentTarget;
     const raw = inputEl.files?.[0] ?? null;
+    inputEl.value = ""; // 같은 파일 재선택 가능
     if (!raw) return;
-  
+    setEditorSource(raw);
+    setEditorOpen(true);
+  };
+
+  // 현재(저장된/새로 고른) 배너를 편집기로 열기
+  const openBannerEditor = () => {
+    const src = bannerImageFile ?? bannerUrl;
+    if (!src) {
+      openFilePicker();
+      return;
+    }
+    setEditorSource(src);
+    setEditorOpen(true);
+  };
+
+  // 편집기에서 확정된 이미지 업로드
+  const uploadBanner = async (file: File) => {
     setIsUploadingBanner(true);
     try {
-      // 1) 비율 보정
-      const fixed = await normalizeBannerImage(raw);
-  
-      // 2) 미리보기(낙관적 UI)
-      setBannerImageFile(fixed);
-  
-      // 3) presigned 발급 → 업로드
-      const { url, contentId } = await requestImagePresignedUrl(fixed, "NOTICE_BANNER");
-      await putFileToPresignedUrl(url, fixed);
-
-      // 4) contentId 저장 (number로 그대로)
+      setBannerImageFile(file); // 낙관적 미리보기
+      const { url, contentId } = await requestImagePresignedUrl(file, "NOTICE_BANNER");
+      await putFileToPresignedUrl(url, file);
       setBannerContentId(Number(contentId));
-
     } catch (err: any) {
       console.error(err);
       alert(err?.message ?? "배너 이미지 업로드에 실패했습니다.");
@@ -196,8 +208,6 @@ const onPickBanner: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
       setBannerContentId(undefined);
     } finally {
       setIsUploadingBanner(false);
-      // 같은 파일 다시 선택 가능하도록 (input이 존재할 때만)
-      if (inputEl) inputEl.value = "";
     }
   };
   
@@ -304,11 +314,20 @@ const onPickBanner: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
 
     {/* 공통: 배너 */}
     <section className="space-y-2">
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
         <label className="block text-sm font-medium">배너 이미지</label>
         <span className="text-xs text-gray-500">
-        사진을 클릭하면 이미지를 수정할 수 있습니다.
+        사진을 클릭하면 새 이미지를 올릴 수 있어요.
         </span>
+        {bannerPreview && (
+          <button
+            type="button"
+            onClick={openBannerEditor}
+            className="ml-auto rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            현재 이미지 배경 편집
+          </button>
+        )}
     </div>
 
     <div
@@ -399,6 +418,18 @@ const onPickBanner: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
           </div>
         </div>
       </main>
+
+      <BannerImageEditor
+        open={editorOpen}
+        source={editorSource}
+        targetAspect={BANNER_ASPECT}
+        minWidth={BANNER_MIN_WIDTH}
+        onCancel={() => setEditorOpen(false)}
+        onConfirm={(file) => {
+          setEditorOpen(false);
+          uploadBanner(file);
+        }}
+      />
     </div>
   );
 }

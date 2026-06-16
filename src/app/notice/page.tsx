@@ -97,7 +97,23 @@ const NoticePage: React.FC = () => {
                 >
                   #{n.noticeId}
                 </span>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => router.push(`/notice/edit/${n.noticeId}`)}
+                  onKeyDown={(e) =>
+                    (e.key === "Enter" || e.key === " ") &&
+                    router.push(`/notice/edit/${n.noticeId}`)
+                  }
+                  title="편집 페이지로 이동"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    minWidth: 0,
+                    cursor: "pointer",
+                  }}
+                >
                   <div
                     style={{
                       width: 80,
@@ -117,7 +133,21 @@ const NoticePage: React.FC = () => {
                       />
                     )}
                   </div>
-                  <span style={{ fontWeight: 600, color: "var(--admin-ink)" }}>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "var(--admin-ink)",
+                      textDecorationLine: "underline",
+                      textDecorationColor: "transparent",
+                      transition: "text-decoration-color .15s",
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.textDecorationColor = "var(--admin-ink-3)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.textDecorationColor = "transparent")
+                    }
+                  >
                     배너 공지 #{n.noticeId}
                   </span>
                 </div>

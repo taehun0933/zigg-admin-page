@@ -1,4 +1,7 @@
+"use client";
+
 import React from "react";
+import { useIsMobile } from "./useIsMobile";
 
 interface PageShellProps {
   eyebrow?: string;
@@ -16,15 +19,18 @@ const PageShell: React.FC<PageShellProps> = ({
   action,
   children,
   maxWidth = 1320,
-}) => (
-  <div style={{ padding: "28px 32px 60px", maxWidth, margin: "0 auto" }}>
+}) => {
+  const isMobile = useIsMobile();
+  return (
+  <div style={{ padding: isMobile ? "20px 14px 48px" : "28px 32px 60px", maxWidth, margin: "0 auto" }}>
     <div
       style={{
         display: "flex",
         alignItems: "flex-end",
         justifyContent: "space-between",
-        gap: 16,
+        gap: 12,
         marginBottom: 24,
+        flexWrap: "wrap",
       }}
     >
       <div style={{ minWidth: 0 }}>
@@ -67,7 +73,8 @@ const PageShell: React.FC<PageShellProps> = ({
     </div>
     {children}
   </div>
-);
+  );
+};
 
 export default PageShell;
 

@@ -7,6 +7,7 @@ import AdminIcon from "./AdminIcon";
 import ServerToggle from "./ServerToggle";
 import { useUnansweredInquiryCount } from "./useUnansweredInquiryCount";
 import { usePendingTrainerCount } from "./usePendingTrainerCount";
+import { useIsMobile } from "./useIsMobile";
 
 interface NavItem {
   id: string;
@@ -40,6 +41,8 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
   const { setIsLoggedIn } = useAuth();
 
   const [collapsed, setCollapsed] = useState(false);
+  const isMobile = useIsMobile();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const unansweredCount = useUnansweredInquiryCount();
   const trainerPendingCount = usePendingTrainerCount();
 
@@ -47,6 +50,16 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
     const stored = localStorage.getItem(SIDEBAR_KEY);
     if (stored === "1") setCollapsed(true);
   }, []);
+
+  // 라우트 이동 시 모바일 드로어 닫기
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  // 데스크탑 복귀 시 드로어 상태 정리
+  useEffect(() => {
+    if (!isMobile) setDrawerOpen(false);
+  }, [isMobile]);
 
   const toggleCollapsed = () => {
     setCollapsed((c) => {
@@ -67,6 +80,8 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
   const current =
     NAV.find((n) => pathname === n.path || pathname.startsWith(n.path + "/")) ?? NAV[0];
 
+  // 모바일에서는 드로어로 동작하므로 항상 펼친(레이블 보이는) 상태로 렌더
+  const sidebarCollapsed = collapsed && !isMobile;
   const w = collapsed ? "var(--admin-sidebar-collapsed)" : "var(--admin-sidebar-w)";
 
   return (
@@ -74,20 +89,47 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
       style={{
         minHeight: "100vh",
         display: "grid",
-        gridTemplateColumns: `${w} 1fr`,
+        gridTemplateColumns: isMobile ? "1fr" : `${w} 1fr`,
         transition: "grid-template-columns .25s ease",
         background: "var(--admin-bg)",
       }}
     >
+      {/* 모바일 드로어 백드롭 */}
+      {isMobile && drawerOpen && (
+        <div
+          onClick={() => setDrawerOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 40,
+            background: "rgba(0,0,0,.4)",
+          }}
+        />
+      )}
       <aside
         style={{
           background: "#fff",
           borderRight: "1px solid var(--admin-border)",
-          position: "sticky",
-          top: 0,
-          height: "100vh",
           display: "flex",
           flexDirection: "column",
+          ...(isMobile
+            ? {
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "var(--admin-sidebar-w)",
+                maxWidth: "82vw",
+                height: "100vh",
+                zIndex: 50,
+                transform: drawerOpen ? "translateX(0)" : "translateX(-100%)",
+                transition: "transform .25s ease",
+                boxShadow: drawerOpen ? "0 0 40px rgba(0,0,0,.18)" : "none",
+              }
+            : {
+                position: "sticky",
+                top: 0,
+                height: "100vh",
+              }),
         }}
       >
         {/* Logo (click → dashboard) */}
@@ -99,8 +141,8 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
             height: "var(--admin-topbar-h)",
             display: "flex",
             alignItems: "center",
-            padding: collapsed ? 0 : "0 18px",
-            justifyContent: collapsed ? "center" : "flex-start",
+            padding: sidebarCollapsed ? 0 : "0 18px",
+            justifyContent: sidebarCollapsed ? "center" : "flex-start",
             gap: 10,
             borderBottom: "1px solid var(--admin-border)",
             background: "transparent",
@@ -125,7 +167,7 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
               flexShrink: 0,
             }}
           />
-          {!collapsed && (
+          {!sidebarCollapsed && (
             <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
               <span style={{ fontWeight: 700, fontSize: 14, color: "var(--admin-ink)" }}>
                 ZIGG Admin
@@ -150,7 +192,7 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
             overflowY: "auto",
           }}
         >
-          {!collapsed && (
+          {!sidebarCollapsed && (
             <div
               style={{
                 padding: "6px 12px",
@@ -178,14 +220,14 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
               <button
                 key={item.id}
                 onClick={() => router.push(item.path)}
-                title={collapsed ? item.label : ""}
+                title={sidebarCollapsed ? item.label : ""}
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: 12,
-                  padding: collapsed ? "12px 0" : "11px 12px",
+                  padding: sidebarCollapsed ? "12px 0" : "11px 12px",
                   borderRadius: 10,
-                  justifyContent: collapsed ? "center" : "flex-start",
+                  justifyContent: sidebarCollapsed ? "center" : "flex-start",
                   background: active ? "var(--admin-blue-tint)" : "transparent",
                   color: active ? "var(--admin-blue)" : "var(--admin-ink)",
                   fontWeight: active ? 600 : 500,
@@ -200,7 +242,7 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
                   if (!active) e.currentTarget.style.background = "transparent";
                 }}
               >
-                {active && !collapsed && (
+                {active && !sidebarCollapsed && (
                   <span
                     style={{
                       position: "absolute",
@@ -219,7 +261,7 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
                     size={20}
                     opacity={active ? 1 : 0.7}
                   />
-                  {badgeCount > 0 && collapsed && (
+                  {badgeCount > 0 && sidebarCollapsed && (
                     <span
                       title={badgeTitle}
                       style={{
@@ -245,7 +287,7 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
                     </span>
                   )}
                 </span>
-                {!collapsed && (
+                {!sidebarCollapsed && (
                   <>
                     <span>{item.label}</span>
                     {badgeCount > 0 && (
@@ -279,7 +321,7 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
         </nav>
 
         {/* Footer (user info only — logout moved to topbar) */}
-        {!collapsed && (
+        {!sidebarCollapsed && (
           <div
             style={{
               borderTop: "1px solid var(--admin-border)",
@@ -322,22 +364,23 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
             borderBottom: "1px solid var(--admin-border)",
             display: "flex",
             alignItems: "center",
-            padding: "0 24px",
-            gap: 16,
+            padding: isMobile ? "0 12px" : "0 24px",
+            gap: isMobile ? 8 : 16,
             position: "sticky",
             top: 0,
             zIndex: 20,
           }}
         >
           <button
-            onClick={toggleCollapsed}
-            title="메뉴 접기"
+            onClick={isMobile ? () => setDrawerOpen(true) : toggleCollapsed}
+            title={isMobile ? "메뉴 열기" : "메뉴 접기"}
             style={{
               width: 36,
               height: 36,
               borderRadius: 8,
               display: "grid",
               placeItems: "center",
+              flexShrink: 0,
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = "#f4f5f8")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
@@ -345,15 +388,37 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
             <AdminIcon name="hamburger" size={18} />
           </button>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-            <span style={{ color: "var(--admin-ink-3)" }}>운영</span>
-            <span style={{ color: "var(--admin-ink-3)" }}>›</span>
-            <span style={{ fontWeight: 600 }}>{current.label}</span>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 14,
+              minWidth: 0,
+              overflow: "hidden",
+            }}
+          >
+            {!isMobile && (
+              <>
+                <span style={{ color: "var(--admin-ink-3)" }}>운영</span>
+                <span style={{ color: "var(--admin-ink-3)" }}>›</span>
+              </>
+            )}
+            <span
+              style={{
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {current.label}
+            </span>
           </div>
 
           <div style={{ flex: 1 }} />
 
-          <ServerToggle />
+          <ServerToggle compact={isMobile} />
 
           <button
             onClick={handleLogout}
@@ -363,13 +428,14 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
               alignItems: "center",
               gap: 6,
               height: 34,
-              padding: "0 12px",
+              padding: isMobile ? "0 9px" : "0 12px",
               borderRadius: 8,
               border: "1px solid var(--admin-border)",
               background: "#fff",
               color: "var(--admin-ink-2)",
               fontWeight: 600,
               fontSize: 13,
+              flexShrink: 0,
               transition: "background .15s, border-color .15s",
             }}
             onMouseEnter={(e) => {
@@ -382,7 +448,7 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
             }}
           >
             <AdminIcon name="logout" size={16} />
-            로그아웃
+            {!isMobile && "로그아웃"}
           </button>
         </header>
 

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
 import AdminIcon from "@/components/admin/AdminIcon";
 import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
+import { useIsMobile } from "@/components/admin/useIsMobile";
 import { adminCardStyle, btnPrimary, btnSecondary } from "@/components/admin/PageShell";
 import ApplicantDetailModal from "@/components/ApplicantDetailModal";
 import {
@@ -55,6 +56,7 @@ const AuditionDetailPage: React.FC = () => {
   const params = useParams<{ id: string }>();
   const id = Number(params?.id);
   const ready = useAdminAuthGuard();
+  const isMobile = useIsMobile();
 
   // chip selector
   const [auditions, setAuditions] = useState<Audition[]>([]);
@@ -362,10 +364,23 @@ const AuditionDetailPage: React.FC = () => {
 
   return (
     <AdminShell>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", minHeight: "100%" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "1fr 280px",
+          minHeight: "100%",
+        }}
+      >
         <div style={{ minWidth: 0 }}>
           {/* Page header */}
-          <div style={{ padding: "24px 32px 0", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
+          <div
+            style={{
+              padding: isMobile ? "18px 14px 0" : "24px 32px 0",
+              maxWidth: 1320,
+              margin: "0 auto",
+              width: "100%",
+            }}
+          >
             <div
               style={{
                 display: "flex",
@@ -428,7 +443,14 @@ const AuditionDetailPage: React.FC = () => {
               paddingTop: 4,
             }}
           >
-            <div style={{ padding: "0 32px", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
+            <div
+              style={{
+                padding: isMobile ? "0 14px" : "0 32px",
+                maxWidth: 1320,
+                margin: "0 auto",
+                width: "100%",
+              }}
+            >
               {auditionsWithColor.length > 1 && (
                 <div
                   style={{
@@ -609,7 +631,14 @@ const AuditionDetailPage: React.FC = () => {
           </div>
 
           {/* Applicant list */}
-          <div style={{ padding: "0 32px 80px", maxWidth: 1320, margin: "0 auto", width: "100%" }}>
+          <div
+            style={{
+              padding: isMobile ? "0 14px 60px" : "0 32px 80px",
+              maxWidth: 1320,
+              margin: "0 auto",
+              width: "100%",
+            }}
+          >
             {groups.map((g) => (
               <div key={g.start}>
                 <div style={{ padding: "12px 0", display: "flex", alignItems: "center", gap: 12 }}>
@@ -682,6 +711,7 @@ const AuditionDetailPage: React.FC = () => {
 
         {/* Rail (북마크 / 합격자) */}
         <BookmarkRail
+          isMobile={isMobile}
           tab={railTab}
           onTabChange={setRailTab}
           scrapCount={scrapList.length}
@@ -946,6 +976,7 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({ applicant, idx, onClick, 
 };
 
 interface BookmarkRailProps {
+  isMobile: boolean;
   tab: RailTab;
   onTabChange: (t: RailTab) => void;
   scrapCount: number;
@@ -966,6 +997,7 @@ const RAIL_TABS: { id: RailTab; label: string; icon: string }[] = [
 ];
 
 const BookmarkRail: React.FC<BookmarkRailProps> = ({
+  isMobile,
   tab,
   onTabChange,
   scrapCount,
@@ -987,14 +1019,20 @@ const BookmarkRail: React.FC<BookmarkRailProps> = ({
   return (
     <aside
       style={{
-        borderLeft: "1px solid var(--admin-border)",
         background: "#fff",
-        position: "sticky",
-        top: "var(--admin-topbar-h)",
-        height: "calc(100vh - var(--admin-topbar-h))",
         display: "flex",
         flexDirection: "column",
-        alignSelf: "start",
+        ...(isMobile
+          ? {
+              borderTop: "8px solid var(--admin-bg)",
+            }
+          : {
+              borderLeft: "1px solid var(--admin-border)",
+              position: "sticky",
+              top: "var(--admin-topbar-h)",
+              height: "calc(100vh - var(--admin-topbar-h))",
+              alignSelf: "start",
+            }),
       }}
     >
       {/* 현재 위치 + 책갈피 끼우기 */}

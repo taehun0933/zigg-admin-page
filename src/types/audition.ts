@@ -22,6 +22,7 @@ export interface AuditionProfileType {
   auditionId: number;
   createdAt: string; // ISO string
   acceptFeedback: boolean;
+  hasFeedback?: boolean; // 트레이너 피드백이 1건 이상 작성됐는지 ("피드백 완료" 표시용)
 }
 
 /** 오디션 프로필 목록 API 응답 (Spring Page) */

@@ -700,6 +700,12 @@ const AuditionDetailPage: React.FC = () => {
           selected ? content.findIndex((c) => c.id === selected.id) + 1 || undefined : undefined
         }
         onClose={() => setSelected(null)}
+        onFeedbackChange={(applicantId, hasFeedback) => {
+          setContent((prev) =>
+            prev.map((c) => (c.id === applicantId ? { ...c, hasFeedback } : c)),
+          );
+          setSelected((s) => (s && s.id === applicantId ? { ...s, hasFeedback } : s));
+        }}
         onPrev={(() => {
           if (!selected) return undefined;
           const i = content.findIndex((c) => c.id === selected.id);
@@ -809,22 +815,50 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({ applicant, idx, onClick, 
         >
           #{idx}
         </span>
-        {applicant.acceptFeedback && (
-          <span
+        {/* hasFeedback 필드가 실제로 내려올 때만 표시 (구버전 백엔드에선 미표시) */}
+        {(applicant.hasFeedback === true ||
+          (applicant.hasFeedback === false && applicant.acceptFeedback)) && (
+          <div
             style={{
               position: "absolute",
               bottom: 8,
               left: 8,
-              fontSize: 10,
-              fontWeight: 700,
-              padding: "3px 7px",
-              borderRadius: 999,
-              background: "#e6f7ec",
-              color: "#1f9d57",
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+              alignItems: "flex-start",
             }}
           >
-            피드백 O
-          </span>
+            {applicant.hasFeedback ? (
+              // 트레이너가 실제로 피드백을 남김 → 완료
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  padding: "3px 8px",
+                  borderRadius: 999,
+                  background: "#1f9d57",
+                  color: "#fff",
+                }}
+              >
+                ✓ 피드백 완료
+              </span>
+            ) : (
+              // 피드백 받기로 동의했는데 아직 피드백이 없음 → 누락 주의
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "3px 8px",
+                  borderRadius: 999,
+                  background: "#fff4e5",
+                  color: "#c77700",
+                }}
+              >
+                피드백 대기
+              </span>
+            )}
+          </div>
         )}
         <div style={{ position: "absolute", bottom: 8, right: 8, display: "flex", gap: 6 }}>
           <button

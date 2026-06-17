@@ -20,6 +20,8 @@ interface Props {
   onNext?: () => void;
   onToggleScrap?: () => void;
   onToggleLike?: () => void;
+  /** 피드백이 추가/삭제되어 "피드백 완료" 여부가 바뀌면 목록 카드 갱신용으로 호출 */
+  onFeedbackChange?: (applicantId: number, hasFeedback: boolean) => void;
 }
 
 const TYPE_TONE: Record<string, { tint: string; fg: string }> = {
@@ -48,6 +50,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
   onNext,
   onToggleScrap,
   onToggleLike,
+  onFeedbackChange,
   idx,
 }) => {
   const [feedbackText, setFeedbackText] = useState("");
@@ -67,13 +70,16 @@ const ApplicantDetailModal: React.FC<Props> = ({
     setLoadingFeedbacks(true);
     try {
       const data = await getAuditionFeedbacks(applicant.auditionId, applicant.id);
-      setFeedbacks(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setFeedbacks(list);
+      // 목록 카드의 "피드백 완료/대기" 뱃지를 즉시 반영
+      onFeedbackChange?.(applicant.id, list.length > 0);
     } catch (e: any) {
       setError(e?.message ?? "피드백 목록을 불러오지 못했어요.");
     } finally {
       setLoadingFeedbacks(false);
     }
-  }, [applicant]);
+  }, [applicant, onFeedbackChange]);
 
   // 지원자가 바뀔 때(다른 사람 선택)만 초기화/포커스.
   // 같은 지원자의 isScrap/isLiked 토글로 객체 참조만 새로 생긴 경우엔 실행 안 함.

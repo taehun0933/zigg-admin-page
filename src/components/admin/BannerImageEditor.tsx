@@ -27,6 +27,7 @@ interface Props {
 }
 
 const PREVIEW_W = 900;
+const MAX_OUT_W = 2000; // 출력 배너 가로 상한 (세로 이미지 width 폭발 방지)
 
 function rgbToHex(r: number, g: number, b: number): string {
   const h = (n: number) => n.toString(16).padStart(2, "0");
@@ -190,10 +191,10 @@ const BannerImageEditor: React.FC<Props> = ({
     };
   }, [open, source]);
 
-  // 출력 해상도 계산
+  // 출력 해상도 계산 — 9:5.16 배너. 세로 이미지에서 width 가 폭발하지 않도록 상한을 둠
   const computeOut = useCallback(
-    (natW: number, natH: number) => {
-      const outW = Math.max(minWidth, natW, Math.round(natH * targetAspect));
+    (natW: number) => {
+      const outW = Math.min(MAX_OUT_W, Math.max(minWidth, natW));
       const outH = Math.round(outW / targetAspect);
       return { outW, outH };
     },
@@ -207,20 +208,29 @@ const BannerImageEditor: React.FC<Props> = ({
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, cw, ch);
       if (!img) return;
-      // autoTrim 이면 단색 여백을 잘라낸 컨텐츠 영역만 소스로 사용
-      const src =
-        autoTrim && box
-          ? box
-          : { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight };
+      const natW = img.naturalWidth;
+      const natH = img.naturalHeight;
+      // 스케일·배치는 "전체 이미지" 기준 → 컨텐츠 크기/위치를 그대로 유지(확대 안 함)
       const scale =
         fit === "cover"
-          ? Math.max(cw / src.w, ch / src.h)
-          : Math.min(cw / src.w, ch / src.h);
-      const dw = src.w * scale;
-      const dh = src.h * scale;
-      const dx = (cw - dw) / 2;
-      const dy = (ch - dh) / 2;
-      ctx.drawImage(img, src.x, src.y, src.w, src.h, dx, dy, dw, dh);
+          ? Math.max(cw / natW, ch / natH)
+          : Math.min(cw / natW, ch / natH);
+      const fullDx = (cw - natW * scale) / 2;
+      const fullDy = (ch - natH * scale) / 2;
+      // autoTrim 이면 흰 여백을 뺀 컨텐츠 박스만 그림 → 여백 자리는 bgColor 로 채워짐
+      const src =
+        autoTrim && box ? box : { x: 0, y: 0, w: natW, h: natH };
+      ctx.drawImage(
+        img,
+        src.x,
+        src.y,
+        src.w,
+        src.h,
+        fullDx + src.x * scale,
+        fullDy + src.y * scale,
+        src.w * scale,
+        src.h * scale,
+      );
     },
     [bgColor, fit, img, autoTrim, box],
   );
@@ -261,11 +271,7 @@ const BannerImageEditor: React.FC<Props> = ({
     if (!img) return;
     setExporting(true);
     try {
-      const src =
-        autoTrim && box
-          ? box
-          : { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight };
-      const { outW, outH } = computeOut(src.w, src.h);
+      const { outW, outH } = computeOut(img.naturalWidth);
       const canvas = document.createElement("canvas");
       canvas.width = outW;
       canvas.height = outH;

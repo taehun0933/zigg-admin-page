@@ -66,6 +66,7 @@ const NoticePage: React.FC = () => {
             <span>ID</span>
             <span>배너</span>
             <span>외부 링크</span>
+            <span>등록일</span>
             <span style={{ textAlign: "right" }}>액션</span>
           </div>
 
@@ -172,6 +173,15 @@ const NoticePage: React.FC = () => {
                   title={n.bannerImage?.onClickUrl ?? ""}
                 >
                   {n.bannerImage?.onClickUrl ?? "—"}
+                </span>
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: "var(--admin-ink-3)",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {formatDate(n.createdAt)}
                 </span>
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   <button

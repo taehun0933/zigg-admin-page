@@ -12,6 +12,7 @@ export interface AdminNoticeBanner {
     imageKey: string;
     onClickUrl: string | null;
   };
+  createdAt?: string;
 }
 
 // 상세 조회 응답 (백엔드 스키마에 맞춰 필드명 작성)

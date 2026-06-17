@@ -33,25 +33,34 @@ function rgbToHex(r: number, g: number, b: number): string {
   return `#${h(r)}${h(g)}${h(b)}`;
 }
 
-/** 이미지 좌/우/상/하 가장자리 픽셀 평균색 추출 → 여백 채울 기본 배경색 */
-function detectEdgeColor(img: HTMLImageElement): string {
+interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** (선택한 영역의) 좌/우/상/하 가장자리 픽셀 평균색 추출 → 여백 채울 기본 배경색 */
+function detectEdgeColor(img: HTMLImageElement, box?: Box): string {
   try {
-    const w = img.naturalWidth;
-    const h = img.naturalHeight;
     const c = document.createElement("canvas");
-    c.width = w;
-    c.height = h;
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
     const ctx = c.getContext("2d", { willReadFrequently: true })!;
     ctx.drawImage(img, 0, 0);
+    const bx = box?.x ?? 0;
+    const by = box?.y ?? 0;
+    const bw = box?.w ?? img.naturalWidth;
+    const bh = box?.h ?? img.naturalHeight;
     const samples: [number, number][] = [];
     const steps = 24;
     for (let i = 0; i <= steps; i++) {
-      const y = Math.min(h - 1, Math.round((h - 1) * (i / steps)));
-      samples.push([0, y]);
-      samples.push([w - 1, y]);
-      const x = Math.min(w - 1, Math.round((w - 1) * (i / steps)));
-      samples.push([x, 0]);
-      samples.push([x, h - 1]);
+      const y = Math.min(by + bh - 1, by + Math.round((bh - 1) * (i / steps)));
+      samples.push([bx, y]);
+      samples.push([bx + bw - 1, y]);
+      const x = Math.min(bx + bw - 1, bx + Math.round((bw - 1) * (i / steps)));
+      samples.push([x, by]);
+      samples.push([x, by + bh - 1]);
     }
     let r = 0,
       g = 0,
@@ -70,6 +79,61 @@ function detectEdgeColor(img: HTMLImageElement): string {
   }
 }
 
+/**
+ * 단색(주로 흰색) 테두리를 제외한 실제 컨텐츠 영역(bounding box) 계산.
+ * 이미 흰 여백이 구워진(baked-in) 배너에서 흰 부분을 잘라내기 위함.
+ * 기준색 = 네 모서리 평균. 허용오차(tol) 안의 픽셀은 "여백"으로 간주.
+ */
+function computeContentBox(img: HTMLImageElement, tol = 22): Box {
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  const full: Box = { x: 0, y: 0, w, h };
+  try {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext("2d", { willReadFrequently: true })!;
+    ctx.drawImage(img, 0, 0);
+    const { data } = ctx.getImageData(0, 0, w, h);
+    // 네 모서리 평균을 배경 기준색으로
+    const corner = (cx: number, cy: number) => {
+      const i = (cy * w + cx) * 4;
+      return [data[i], data[i + 1], data[i + 2]];
+    };
+    const corners = [
+      corner(0, 0),
+      corner(w - 1, 0),
+      corner(0, h - 1),
+      corner(w - 1, h - 1),
+    ];
+    const br = Math.round(corners.reduce((s, c2) => s + c2[0], 0) / 4);
+    const bg = Math.round(corners.reduce((s, c2) => s + c2[1], 0) / 4);
+    const bb = Math.round(corners.reduce((s, c2) => s + c2[2], 0) / 4);
+    const isBg = (i: number) =>
+      Math.abs(data[i] - br) <= tol &&
+      Math.abs(data[i + 1] - bg) <= tol &&
+      Math.abs(data[i + 2] - bb) <= tol;
+    let minX = w,
+      minY = h,
+      maxX = -1,
+      maxY = -1;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (!isBg((y * w + x) * 4)) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return full; // 전부 단색이면 자르지 않음
+    return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+  } catch {
+    return full;
+  }
+}
+
 const BannerImageEditor: React.FC<Props> = ({
   open,
   source,
@@ -81,6 +145,8 @@ const BannerImageEditor: React.FC<Props> = ({
   onConfirm,
 }) => {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
+  const [box, setBox] = useState<Box | null>(null); // 단색 여백 제외 컨텐츠 영역
+  const [autoTrim, setAutoTrim] = useState(true); // 흰 여백 자동 제거
   const [bgColor, setBgColor] = useState("#ffffff");
   const [fit, setFit] = useState<FitMode>("contain");
   const [eyedropper, setEyedropper] = useState(false);
@@ -99,9 +165,11 @@ const BannerImageEditor: React.FC<Props> = ({
     const image = new Image();
     const onload = () => {
       setImg(image);
-      // 가장자리 색 자동 추출 → 기본 배경색
-      const edge = detectEdgeColor(image);
-      setBgColor(edge);
+      // 단색(흰) 여백 제외 컨텐츠 영역 계산
+      const cb = computeContentBox(image);
+      setBox(cb);
+      // 잘라낸 컨텐츠의 가장자리 색을 기본 배경색으로 (여백이 흰색이어도 실제 컨텐츠색 추출)
+      setBgColor(detectEdgeColor(image, cb));
       setLoading(false);
     };
     image.onload = onload;
@@ -139,19 +207,22 @@ const BannerImageEditor: React.FC<Props> = ({
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, cw, ch);
       if (!img) return;
-      const natW = img.naturalWidth;
-      const natH = img.naturalHeight;
+      // autoTrim 이면 단색 여백을 잘라낸 컨텐츠 영역만 소스로 사용
+      const src =
+        autoTrim && box
+          ? box
+          : { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight };
       const scale =
         fit === "cover"
-          ? Math.max(cw / natW, ch / natH)
-          : Math.min(cw / natW, ch / natH);
-      const dw = natW * scale;
-      const dh = natH * scale;
+          ? Math.max(cw / src.w, ch / src.h)
+          : Math.min(cw / src.w, ch / src.h);
+      const dw = src.w * scale;
+      const dh = src.h * scale;
       const dx = (cw - dw) / 2;
       const dy = (ch - dh) / 2;
-      ctx.drawImage(img, dx, dy, dw, dh);
+      ctx.drawImage(img, src.x, src.y, src.w, src.h, dx, dy, dw, dh);
     },
-    [bgColor, fit, img],
+    [bgColor, fit, img, autoTrim, box],
   );
 
   // preview 다시 그리기
@@ -190,7 +261,11 @@ const BannerImageEditor: React.FC<Props> = ({
     if (!img) return;
     setExporting(true);
     try {
-      const { outW, outH } = computeOut(img.naturalWidth, img.naturalHeight);
+      const src =
+        autoTrim && box
+          ? box
+          : { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight };
+      const { outW, outH } = computeOut(src.w, src.h);
       const canvas = document.createElement("canvas");
       canvas.width = outW;
       canvas.height = outH;
@@ -279,6 +354,22 @@ const BannerImageEditor: React.FC<Props> = ({
                 </button>
               </div>
             </div>
+
+            {/* 흰 여백 자동 제거 */}
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <input
+                type="checkbox"
+                checked={autoTrim}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setAutoTrim(next);
+                  // 잘라냄 여부에 맞춰 추천 배경색 갱신
+                  if (img) setBgColor(detectEdgeColor(img, next && box ? box : undefined));
+                }}
+                className="h-4 w-4 cursor-pointer accent-blue-600"
+              />
+              흰 여백 자동 제거
+            </label>
 
             {/* 배경색 */}
             <div className="flex items-center gap-2">

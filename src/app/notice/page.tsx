@@ -7,6 +7,16 @@ import PageShell, { adminCardStyle, btnPrimary } from "@/components/admin/PageSh
 import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
 import { getAdminNoticeBanners, AdminNoticeBanner } from "@/apis/notice";
 
+const formatDate = (iso?: string): string => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}.${m}.${day}`;
+};
+
 const NoticePage: React.FC = () => {
   const router = useRouter();
   const ready = useAdminAuthGuard();
@@ -43,7 +53,7 @@ const NoticePage: React.FC = () => {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "80px 1fr 160px 120px",
+              gridTemplateColumns: "72px 1fr 150px 110px 92px",
               padding: "12px 22px",
               borderBottom: "1px solid var(--admin-border)",
               fontSize: 11,
@@ -80,7 +90,7 @@ const NoticePage: React.FC = () => {
                 key={n.noticeId}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "80px 1fr 160px 120px",
+                  gridTemplateColumns: "72px 1fr 150px 110px 92px",
                   padding: "14px 22px",
                   borderTop: i ? "1px solid var(--admin-border)" : "none",
                   alignItems: "center",

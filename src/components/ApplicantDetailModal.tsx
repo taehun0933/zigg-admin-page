@@ -494,18 +494,23 @@ const ApplicantDetailModal: React.FC<Props> = ({
               >
                 <MetaRow icon="instagram" label="Instagram">
                   {a.instagramId ? (
-                    <a
-                      href={`https://www.instagram.com/${a.instagramId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        color: "var(--admin-blue)",
-                        fontWeight: 600,
-                        fontSize: 13,
-                      }}
-                    >
-                      @{a.instagramId}
-                    </a>
+                    (() => {
+                      const handle = normalizeInstagramHandle(a.instagramId);
+                      return (
+                        <a
+                          href={`https://www.instagram.com/${handle}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: "var(--admin-blue)",
+                            fontWeight: 600,
+                            fontSize: 13,
+                          }}
+                        >
+                          @{handle}
+                        </a>
+                      );
+                    })()
                   ) : (
                     <span style={{ color: "var(--admin-ink-3)", fontSize: 13 }}>미연동</span>
                   )}
@@ -1017,6 +1022,18 @@ const Stat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
 const Divider: React.FC = () => (
   <div style={{ width: 1, background: "var(--admin-border)", margin: "4px 0" }} />
 );
+
+// 지원자가 핸들 대신 전체 URL(쿼리스트링 포함)이나 @아이디를 입력하는 경우가 있어
+// 인스타그램 아이디만 추출한다. (예: https://www.instagram.com/foo?igsh=...&utm_source=... → foo)
+const normalizeInstagramHandle = (raw: string): string => {
+  let v = raw.trim();
+  v = v.replace(/^https?:\/\//i, "").replace(/^www\./i, "");
+  v = v.replace(/^instagram\.com\//i, "");
+  v = v.replace(/^@+/, "");
+  // 첫 경로 세그먼트만 사용하고 쿼리스트링·해시·끝 슬래시는 제거
+  v = v.split(/[/?#]/)[0];
+  return v;
+};
 
 const MetaRow: React.FC<{ icon: string; label: string; children: React.ReactNode }> = ({
   icon,

@@ -34,7 +34,7 @@ export const getAuditionFeedbacks = async (
 };
 
 // {{API_URL}}/admin/v0/auditions/{{auditionId}}/applications/{{applicationId}}/feedbacks/history
-// 같은 지원자에게 내가(현재 강사) 이전 오디션에서 남긴 피드백 (현재 지원서 제외)
+// 이 지원자가 이전 오디션들에서 받은 모든 피드백 (심사위원 무관, 현재 지원서 제외)
 export const getApplicantFeedbackHistory = async (
   auditionId: number,
   applicationId: number

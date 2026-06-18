@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   getAuditionFeedbacks,
+  getApplicantFeedbackHistory,
   sendApplicationFeedback,
   updateAuditionFeedback,
   deleteAuditionFeedback,
@@ -60,6 +61,8 @@ const ApplicantDetailModal: React.FC<Props> = ({
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [feedbacks, setFeedbacks] = useState<AuditionFeedback[]>([]);
   const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
+  // 이 지원자가 이전 오디션들에서 받은 피드백 (현재 지원서 제외)
+  const [history, setHistory] = useState<AuditionFeedback[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -81,6 +84,17 @@ const ApplicantDetailModal: React.FC<Props> = ({
     }
   }, [applicant, onFeedbackChange]);
 
+  // 이전 오디션 피드백은 보조 정보이므로 실패해도 본문 흐름을 막지 않음
+  const refreshHistory = useCallback(async () => {
+    if (!applicant) return;
+    try {
+      const data = await getApplicantFeedbackHistory(applicant.auditionId, applicant.id);
+      setHistory(Array.isArray(data) ? data : []);
+    } catch {
+      setHistory([]);
+    }
+  }, [applicant]);
+
   // 지원자가 바뀔 때(다른 사람 선택)만 초기화/포커스.
   // 같은 지원자의 isScrap/isLiked 토글로 객체 참조만 새로 생긴 경우엔 실행 안 함.
   useEffect(() => {
@@ -90,7 +104,9 @@ const ApplicantDetailModal: React.FC<Props> = ({
     setFeedbackText("");
     setEditingId(null);
     setEditingText("");
+    setHistory([]);
     refreshFeedbacks();
+    refreshHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applicant?.id]);
 
@@ -963,6 +979,105 @@ const ApplicantDetailModal: React.FC<Props> = ({
               </div>
             )}
           </Section>
+
+          {/* 이전 오디션에서 받은 피드백 */}
+          {history.length > 0 && (
+            <Section
+              title="이전 오디션에서 받은 피드백"
+              action={
+                <span style={{ fontSize: 12, color: "var(--admin-ink-3)" }}>
+                  {history.length}건
+                </span>
+              }
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {history.map((fb: any, idx: number) => (
+                  <div
+                    key={fb.id ?? idx}
+                    style={{
+                      border: "1px solid var(--admin-border)",
+                      borderRadius: 12,
+                      padding: "14px 16px",
+                      background: "#fafafc",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 6,
+                        gap: 8,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          minWidth: 0,
+                        }}
+                      >
+                        {fb.auditionTitle && (
+                          <span
+                            style={{
+                              flexShrink: 0,
+                              maxWidth: 180,
+                              padding: "2px 8px",
+                              borderRadius: 6,
+                              background: "var(--admin-blue-tint)",
+                              color: "var(--admin-blue)",
+                              fontSize: 11,
+                              fontWeight: 600,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {fb.auditionTitle}
+                          </span>
+                        )}
+                        <span
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {fb.reviewer?.userNickname ?? fb.reviewer?.userName ?? "관리자"}
+                        </span>
+                      </div>
+                      {fb.createdAt && (
+                        <span
+                          style={{
+                            flexShrink: 0,
+                            fontSize: 11,
+                            color: "var(--admin-ink-3)",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {formatDate(fb.createdAt)}
+                        </span>
+                      )}
+                    </div>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 13.5,
+                        lineHeight: 1.55,
+                        color: "var(--admin-ink)",
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
+                      {fb.textReview}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
         </div>
       </div>
     </div>

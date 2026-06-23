@@ -10,7 +10,13 @@ import { useUnansweredInquiryCount } from "@/components/admin/useUnansweredInqui
 import { fetchStatsOverview, fetchStatsTimeseries, PlatformStats } from "@/apis/stats";
 import { countryNameKo } from "@/utils/countryName";
 
-const STATS_RANGE_DAYS = 60;
+const RANGE_OPTIONS = [
+  { days: 7, label: "최근 7일" },
+  { days: 30, label: "최근 30일" },
+  { days: 60, label: "최근 60일" },
+  { days: 90, label: "최근 90일" },
+] as const;
+const DEFAULT_RANGE_DAYS = 60;
 
 function toIsoDate(d: Date): string {
   return d.toISOString().split("T")[0];
@@ -330,19 +336,33 @@ const DashboardPage: React.FC = () => {
   const unansweredCount = useUnansweredInquiryCount();
   const [overview, setOverview] = useState<PlatformStats | null>(null);
   const [series, setSeries] = useState<PlatformStats[]>([]);
+  const [rangeDays, setRangeDays] = useState<number>(DEFAULT_RANGE_DAYS);
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const rangeRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!ready) return;
     const to = new Date();
     const from = new Date();
-    from.setDate(to.getDate() - (STATS_RANGE_DAYS - 1));
+    from.setDate(to.getDate() - (rangeDays - 1));
     Promise.all([fetchStatsOverview(), fetchStatsTimeseries(toIsoDate(from), toIsoDate(to))]).then(
       ([ov, ts]) => {
         setOverview(ov);
         setSeries(ts);
       },
     );
-  }, [ready]);
+  }, [ready, rangeDays]);
+
+  useEffect(() => {
+    if (!rangeOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (rangeRef.current && !rangeRef.current.contains(e.target as Node)) {
+        setRangeOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [rangeOpen]);
 
   const todayDelta = useMemo(() => {
     if (series.length < 2) return undefined;
@@ -378,9 +398,79 @@ const DashboardPage: React.FC = () => {
         title="관리자 대시보드"
         action={
           <div style={{ display: "flex", gap: 8 }}>
-            <button style={btnSecondary} disabled>
-              <AdminIcon name="chevron_down" size={14} /> 최근 {STATS_RANGE_DAYS}일
-            </button>
+            <div ref={rangeRef} style={{ position: "relative" }}>
+              <button
+                style={{ ...btnSecondary, cursor: "pointer" }}
+                onClick={() => setRangeOpen((o) => !o)}
+                aria-haspopup="listbox"
+                aria-expanded={rangeOpen}
+              >
+                최근 {rangeDays}일
+                <AdminIcon
+                  name="chevron_down"
+                  size={14}
+                  style={{
+                    transform: rangeOpen ? "rotate(180deg)" : "none",
+                    transition: "transform .15s",
+                  }}
+                />
+              </button>
+              {rangeOpen && (
+                <div
+                  role="listbox"
+                  style={{
+                    ...adminCardStyle,
+                    position: "absolute",
+                    top: "calc(100% + 6px)",
+                    right: 0,
+                    minWidth: 150,
+                    padding: 6,
+                    boxShadow: "0 8px 24px rgba(0,0,0,.10)",
+                    zIndex: 20,
+                  }}
+                >
+                  {RANGE_OPTIONS.map((opt) => {
+                    const active = opt.days === rangeDays;
+                    return (
+                      <button
+                        key={opt.days}
+                        role="option"
+                        aria-selected={active}
+                        onClick={() => {
+                          setRangeDays(opt.days);
+                          setRangeOpen(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 8,
+                          height: 36,
+                          padding: "0 10px",
+                          borderRadius: 8,
+                          fontSize: 13,
+                          fontWeight: active ? 700 : 500,
+                          color: active ? "var(--admin-blue)" : "var(--admin-ink)",
+                          background: active ? "var(--admin-blue-tint)" : "transparent",
+                          cursor: "pointer",
+                          textAlign: "left",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!active) e.currentTarget.style.background = "var(--admin-bg, #f6f6f8)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!active) e.currentTarget.style.background = "transparent";
+                        }}
+                      >
+                        {opt.label}
+                        {active && <AdminIcon name="gradient_check" size={14} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         }
       >
@@ -444,7 +534,7 @@ const DashboardPage: React.FC = () => {
               <div>
                 <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>날짜별 유저 수</h3>
                 <p style={{ fontSize: 12, color: "var(--admin-ink-3)", margin: "4px 0 0" }}>
-                  최근 {STATS_RANGE_DAYS}일 · 누적 + 일일 신규
+                  최근 {rangeDays}일 · 누적 + 일일 신규
                 </p>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12 }}>

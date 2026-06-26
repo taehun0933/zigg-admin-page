@@ -47,10 +47,50 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
   const unansweredCount = useUnansweredInquiryCount();
   const trainerPendingCount = usePendingTrainerCount();
 
+  // 로그인한 실제 계정 정보 (JWT 클레임에서 role/email 추출)
+  const [account, setAccount] = useState<{ email: string; role: string }>({
+    email: "",
+    role: "",
+  });
+
   useEffect(() => {
     const stored = localStorage.getItem(SIDEBAR_KEY);
     if (stored === "1") setCollapsed(true);
   }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("token");
+      if (!raw) return;
+      const jwt = raw.replace(/^Bearer\s+/i, "");
+      const part = jwt.split(".")[1];
+      if (!part) return;
+      const json = decodeURIComponent(
+        atob(part.replace(/-/g, "+").replace(/_/g, "/"))
+          .split("")
+          .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+          .join("")
+      );
+      const payload = JSON.parse(json);
+      setAccount({
+        email: payload.email ?? payload.sub ?? "",
+        role: payload.auth ?? "",
+      });
+    } catch {
+      // 토큰 파싱 실패 시 표시 안 함
+    }
+  }, []);
+
+  const ROLE_LABEL: Record<string, string> = {
+    ADMIN: "관리자",
+    TRAINER: "트레이너",
+    USER: "일반 사용자",
+    GUEST: "게스트",
+  };
+  const roleText = account.role
+    ? ROLE_LABEL[account.role] ?? account.role
+    : "계정";
+  const avatarText = (account.email || "AD").slice(0, 2).toUpperCase();
 
   // 라우트 이동 시 모바일 드로어 닫기
   useEffect(() => {
@@ -345,12 +385,21 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
                 fontSize: 12,
               }}
             >
-              AD
+              {avatarText}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>관리자</span>
-              <span style={{ fontSize: 11, color: "var(--admin-ink-3)" }}>
-                godition@naver.com
+            <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2, minWidth: 0 }}>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{roleText}</span>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--admin-ink-3)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+                title={account.email || undefined}
+              >
+                {account.email || "-"}
               </span>
             </div>
           </div>

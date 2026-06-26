@@ -27,6 +27,7 @@ const NAV: NavItem[] = [
   { id: "tickets", label: "티켓 수동 지급", icon: "ticket", path: "/ticket" },
   { id: "voices", label: "고객 목소리함", icon: "mail", path: "/customerInquiry" },
   { id: "trainers", label: "트레이너 관리", icon: "people", path: "/trainer" },
+  { id: "finance", label: "비용 관리", icon: "wallet", path: "/finance" },
 ];
 
 const SIDEBAR_KEY = "admin_sidebar_collapsed";

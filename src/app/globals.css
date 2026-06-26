@@ -19,6 +19,9 @@
   --admin-warn-tint: #fff4e0;
   --admin-good: #2dbd6f;
   --admin-good-tint: #e6f7ee;
+  --admin-red: #ff3b30;
+  --admin-red-tint: #ffeceb;
+  --admin-red-ink: #e0322a;
 
   /* Layout */
   --admin-sidebar-w: 244px;

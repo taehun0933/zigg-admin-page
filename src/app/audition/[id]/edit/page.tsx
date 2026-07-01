@@ -2,7 +2,10 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Navigation, { NavItem } from "@/components/NavigationBar";
+import AdminShell from "@/components/admin/AdminShell";
+import PageShell, { adminCardStyle, btnPrimary, inputStyle } from "@/components/admin/PageShell";
+import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
+import { useIsMobile } from "@/components/admin/useIsMobile";
 import { getAuditionDetail, deleteAudition } from "@/apis/audition";
 import { getApiBaseUrl } from "@/utils/apiConfig";
 import { getUrlForUploadImage, putImageToPresignedUrl } from "@/apis/media";
@@ -16,9 +19,24 @@ interface AuditionEditData {
   thumbnailId?: number | null;             // 서버 DTO와 동일
 }
 
+const Field: React.FC<{ label: string; style?: React.CSSProperties; children: React.ReactNode }> = ({
+  label,
+  style,
+  children,
+}) => (
+  <div style={style}>
+    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--admin-ink-2)", marginBottom: 6 }}>
+      {label}
+    </div>
+    {children}
+  </div>
+);
+
 const AuditionEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const ready = useAdminAuthGuard();
+  const isMobile = useIsMobile();
 
   const [form, setForm] = useState<AuditionEditData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,12 +46,6 @@ const AuditionEditPage: React.FC = () => {
   const [imageMeta, setImageMeta] = useState<{ extension: string; width: number; height: number } | null>(null);
   const [currentImageKey, setCurrentImageKey] = useState<string>(""); // 조회 시 표시용
   const fileRef = useRef<HTMLInputElement | null>(null);
-
-  const navItems: NavItem[] = [
-    { label: "오디션 관리", onClick: () => router.push("/audition") },
-    { label: "공지사항 관리", onClick: () => router.push("/notice") },
-    { label: "로그아웃", onClick: () => router.push("/signin") },
-  ];
 
   const toDateInput = (s?: string) => (s ? new Date(s).toISOString().slice(0, 10) : "");
 
@@ -59,8 +71,6 @@ const AuditionEditPage: React.FC = () => {
     };
     if (id) fetchData();
   }, [id]);
-
-  if (loading || !form) return <div className="p-8">Loading...</div>;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -158,143 +168,191 @@ const AuditionEditPage: React.FC = () => {
     }
   };
 
+  if (!ready) return null;
+
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
-      <Navigation items={navItems} />
+    <AdminShell>
+      <PageShell
+        eyebrow="오디션 관리"
+        title="오디션 정보 수정"
+        subtitle="오디션의 기본 정보와 썸네일을 수정합니다."
+        maxWidth={880}
+        action={
+          <button style={btnPrimary} onClick={handleSubmit} disabled={loading || !form}>
+            수정하기
+          </button>
+        }
+      >
+        {loading || !form ? (
+          <div
+            style={{
+              ...adminCardStyle,
+              padding: 48,
+              textAlign: "center",
+              color: "var(--admin-ink-3)",
+              fontSize: 14,
+            }}
+          >
+            불러오는 중…
+          </div>
+        ) : (
+          <div
+            style={{
+              ...adminCardStyle,
+              padding: isMobile ? 20 : 28,
+              display: "flex",
+              flexDirection: isMobile ? "column" : "row",
+              gap: isMobile ? 20 : 32,
+            }}
+          >
+            {/* 썸네일 */}
+            <div style={{ width: isMobile ? "100%" : 300, flexShrink: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--admin-ink-2)", marginBottom: 6 }}>
+                썸네일
+              </div>
+              <div
+                onClick={handlePick}
+                title="클릭해서 썸네일 변경"
+                style={{
+                  aspectRatio: "1 / 1",
+                  width: "100%",
+                  background: "#f3f3f6",
+                  borderRadius: 12,
+                  display: "grid",
+                  placeItems: "center",
+                  cursor: "pointer",
+                  overflow: "hidden",
+                  position: "relative",
+                }}
+              >
+                {uploadedPreview ? (
+                  <img
+                    src={uploadedPreview}
+                    alt="새 썸네일"
+                    style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                  />
+                ) : currentImageKey ? (
+                  <img
+                    src={currentImageKey}
+                    alt="현재 썸네일"
+                    style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                  />
+                ) : (
+                  <div style={{ textAlign: "center", color: "var(--admin-ink-3)" }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>이미지 업로드</div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>클릭하여 추가</div>
+                  </div>
+                )}
+              </div>
+              <div style={{ marginTop: 10, fontSize: 12, color: "var(--admin-ink-3)" }}>
+                이미지를 클릭하여 변경하세요
+                {uploadedPreview && (
+                  <span style={{ color: "var(--admin-blue)", fontWeight: 600 }}> · 미리보기 적용됨</span>
+                )}
+              </div>
+              {uploadedPreview && (
+                <button
+                  type="button"
+                  style={{
+                    marginTop: 8,
+                    height: 32,
+                    padding: "0 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--admin-border)",
+                    background: "#fff",
+                    color: "var(--admin-ink-2)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                  onClick={() => {
+                    setUploadedPreview(null);
+                    setImageMeta(null);
+                  }}
+                >
+                  선택 취소 (기존 유지)
+                </button>
+              )}
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={handleImageChange}
+              />
+            </div>
 
-      <div className="max-w-xl mx-auto mt-12 p-6 bg-white rounded shadow">
-        <h2 className="text-2xl font-bold mb-6">오디션 정보 수정</h2>
-
-        <table className="w-full border">
-          <tbody>
-            <tr>
-              <th className="text-left p-2 border">제목</th>
-              <td className="p-2 border">
-                <input
-                  name="title"
-                  value={form.title}
-                  onChange={handleInputChange}
-                  className="w-full border rounded p-1"
-                />
-              </td>
-            </tr>
-            <tr>
-              <th className="text-left p-2 border">기획사명</th>
-              <td className="p-2 border">
-                <input
-                  name="company"
-                  value={form.company}
-                  onChange={handleInputChange}
-                  className="w-full border rounded p-1"
-                />
-              </td>
-            </tr>
-            <tr>
-              <th className="text-left p-2 border">지원자격</th>
-              <td className="p-2 border">
+            {/* 폼 필드 */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 14 }}>
+              <Field label="제목">
+                <input name="title" value={form.title} onChange={handleInputChange} style={inputStyle} />
+              </Field>
+              <Field label="기획사명">
+                <input name="company" value={form.company} onChange={handleInputChange} style={inputStyle} />
+              </Field>
+              <Field label="지원자격">
                 <input
                   name="qualification"
                   value={form.qualification}
                   onChange={handleInputChange}
-                  className="w-full border rounded p-1"
+                  style={inputStyle}
                 />
-              </td>
-            </tr>
-            <tr>
-              <th className="text-left p-2 border">시작일</th>
-              <td className="p-2 border">
-                <input
-                  name="startDate"
-                  type="date"
-                  value={form.startDate}
-                  onChange={handleInputChange}
-                  className="w-full border rounded p-1"
-                />
-              </td>
-            </tr>
-            <tr>
-              <th className="text-left p-2 border">종료일</th>
-              <td className="p-2 border">
-                <input
-                  name="endDate"
-                  type="date"
-                  value={form.endDate}
-                  onChange={handleInputChange}
-                  className="w-full border rounded p-1"
-                />
-              </td>
-            </tr>
+              </Field>
+              <div style={{ display: "flex", gap: 12 }}>
+                <Field label="시작일" style={{ flex: 1 }}>
+                  <input
+                    name="startDate"
+                    type="date"
+                    value={form.startDate}
+                    onChange={handleInputChange}
+                    style={inputStyle}
+                  />
+                </Field>
+                <Field label="종료일" style={{ flex: 1 }}>
+                  <input
+                    name="endDate"
+                    type="date"
+                    value={form.endDate}
+                    onChange={handleInputChange}
+                    style={inputStyle}
+                  />
+                </Field>
+              </div>
 
-            {/* 썸네일: 생성 페이지 UX 동일 */}
-            <tr>
-              <th className="text-left p-2 border">썸네일</th>
-              <td className="p-2 border">
-                <div
-                  className="inline-flex items-center gap-4 cursor-pointer"
-                  onClick={handlePick}
-                  title="클릭해서 썸네일 변경"
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginTop: 8,
+                  paddingTop: 16,
+                  borderTop: "1px solid var(--admin-border)",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  style={{
+                    height: 38,
+                    padding: "0 16px",
+                    borderRadius: 10,
+                    background: "#fff",
+                    border: "1px solid #ffd0cc",
+                    color: "#ff453a",
+                    fontWeight: 600,
+                    fontSize: 13,
+                  }}
                 >
-                  <div className="w-[200px] h-[200px] bg-gray-100 rounded border overflow-hidden flex items-center justify-center">
-                    {uploadedPreview ? (
-                      <img src={uploadedPreview} alt="새 썸네일" className="object-contain w-full h-full" />
-                    ) : currentImageKey ? (
-                      <img src={currentImageKey} alt="현재 썸네일" className="object-contain w-full h-full" />
-                    ) : (
-                      <span className="text-gray-400 text-sm">썸네일 없음 (클릭하여 추가)</span>
-                    )}
-                  </div>
-                  <div className="text-sm text-gray-500 hidden sm:block">
-                    이미지를 클릭하여 변경하세요
-                    {uploadedPreview && <div className="text-xs text-rose-500">미리보기 적용됨</div>}
-                  </div>
-                </div>
-
-                <div className="mt-2">
-                  {uploadedPreview && (
-                    <button
-                      type="button"
-                      className="px-3 py-1 text-sm border rounded"
-                      onClick={() => {
-                        setUploadedPreview(null);
-                        setImageMeta(null);
-                      }}
-                    >
-                      선택 취소 (기존 유지)
-                    </button>
-                  )}
-                </div>
-
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageChange}
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div className="flex justify-between mt-6">
-          {/* 삭제 버튼 */}
-          <button
-            className="bg-red-500 text-white px-6 py-2 rounded hover:bg-red-600 transition-colors"
-            onClick={handleDelete}
-          >
-            삭제하기
-          </button>
-
-          {/* 수정 버튼 */}
-          <button
-            className="bg-black text-white px-6 py-2 rounded hover:bg-gray-800 transition-colors"
-            onClick={handleSubmit}
-          >
-            수정하기
-          </button>
-        </div>
-      </div>
-    </div>
+                  삭제하기
+                </button>
+                <button style={btnPrimary} onClick={handleSubmit}>
+                  수정하기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </PageShell>
+    </AdminShell>
   );
 };
 

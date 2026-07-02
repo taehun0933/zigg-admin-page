@@ -9,7 +9,7 @@ import PageShell, {
 } from "@/components/admin/PageShell";
 import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
 import AdminIcon from "@/components/admin/AdminIcon";
-import { Pagination } from "@mui/material";
+import { Pagination, useMediaQuery } from "@mui/material";
 import {
   createFinanceTransaction,
   deleteFinanceTransaction,
@@ -50,6 +50,7 @@ type Filter = FinanceType | "ALL";
 
 const FinancePage: React.FC = () => {
   const ready = useAdminAuthGuard();
+  const isMobile = useMediaQuery("(max-width: 640px)");
 
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [filter, setFilter] = useState<Filter>("ALL");
@@ -248,36 +249,41 @@ const FinancePage: React.FC = () => {
           </span>
         </div>
 
-        {/* (C) 거래 테이블 */}
+        {/* (C) 거래 테이블 (모바일에서는 카드형) */}
         <div
-          className="zg-table-scroll"
+          className={isMobile ? undefined : "zg-table-scroll"}
           style={{ ...adminCardStyle, overflow: "hidden" }}
         >
-          <div className="zg-table-inner" style={{ minWidth: 760 }}>
-            {/* 헤더 */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "110px 72px 104px 92px 168px 1fr 44px",
-                gap: 12,
-                padding: "14px 22px",
-                background: "#fafbfc",
-                borderBottom: "1px solid var(--admin-border)",
-                fontSize: 11,
-                fontWeight: 700,
-                color: "var(--admin-ink-3)",
-                letterSpacing: 0.4,
-                textTransform: "uppercase",
-              }}
-            >
-              <span>거래일</span>
-              <span>구분</span>
-              <span>출처</span>
-              <span>분류</span>
-              <span style={{ textAlign: "right" }}>금액</span>
-              <span>메모</span>
-              <span />
-            </div>
+          <div
+            className={isMobile ? undefined : "zg-table-inner"}
+            style={isMobile ? undefined : { minWidth: 760 }}
+          >
+            {/* 헤더 (데스크톱만) */}
+            {!isMobile && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "110px 72px 104px 92px 168px 1fr 44px",
+                  gap: 12,
+                  padding: "14px 22px",
+                  background: "#fafbfc",
+                  borderBottom: "1px solid var(--admin-border)",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--admin-ink-3)",
+                  letterSpacing: 0.4,
+                  textTransform: "uppercase",
+                }}
+              >
+                <span>거래일</span>
+                <span>구분</span>
+                <span>출처</span>
+                <span>분류</span>
+                <span style={{ textAlign: "right" }}>금액</span>
+                <span>메모</span>
+                <span />
+              </div>
+            )}
 
             {loading && (
               <div style={emptyStyle}>불러오는 중…</div>
@@ -291,14 +297,23 @@ const FinancePage: React.FC = () => {
 
             {!loading &&
               !error &&
-              pageData?.content.map((t, i) => (
-                <TxnRow
-                  key={t.id}
-                  txn={t}
-                  first={i === 0}
-                  onDelete={() => setDelTarget(t)}
-                />
-              ))}
+              pageData?.content.map((t, i) =>
+                isMobile ? (
+                  <TxnCard
+                    key={t.id}
+                    txn={t}
+                    first={i === 0}
+                    onDelete={() => setDelTarget(t)}
+                  />
+                ) : (
+                  <TxnRow
+                    key={t.id}
+                    txn={t}
+                    first={i === 0}
+                    onDelete={() => setDelTarget(t)}
+                  />
+                )
+              )}
           </div>
         </div>
 
@@ -612,6 +627,164 @@ const TxnRow: React.FC<{
           <AdminIcon name="trashcan" size={16} opacity={0.7} />
         </button>
       </span>
+    </div>
+  );
+};
+
+/* ───────────────────────── 거래 카드 (모바일) ───────────────────────── */
+const TxnCard: React.FC<{
+  txn: FinanceTransaction;
+  first: boolean;
+  onDelete: () => void;
+}> = ({ txn, first, onDelete }) => {
+  const isRevenue = txn.type === "REVENUE";
+  const srcChip = SOURCE_CHIP[txn.source];
+  const showFx =
+    txn.source !== "MANUAL" &&
+    txn.originalCurrency === "USD" &&
+    txn.originalAmount != null &&
+    txn.exchangeRate != null;
+  const fxText = showFx
+    ? `(${formatUsd(txn.originalAmount as number)} × ₩${(txn.exchangeRate as number).toLocaleString("ko-KR")})`
+    : "";
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        padding: "14px 16px",
+        borderTop: first ? "none" : "1px solid var(--admin-border)",
+        background: "#fff",
+      }}
+    >
+      {/* 상단: 칩들 + 삭제 */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          {/* 구분 칩 */}
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              height: 23,
+              padding: "0 9px",
+              borderRadius: 7,
+              fontSize: 12,
+              fontWeight: 600,
+              background: isRevenue ? BLUE_TINT : RED_TINT,
+              color: isRevenue ? BLUE : RED,
+            }}
+          >
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: isRevenue ? BLUE : RED_BAR,
+              }}
+            />
+            {isRevenue ? "수익" : "지출"}
+          </span>
+          {/* 출처 칩 */}
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              height: 23,
+              padding: "0 9px",
+              borderRadius: 7,
+              fontSize: 12,
+              fontWeight: 600,
+              background: srcChip.bg,
+              color: srcChip.fg,
+            }}
+          >
+            {SOURCE_LABEL[txn.source]}
+          </span>
+        </div>
+        <button
+          onClick={onDelete}
+          title="삭제"
+          style={{
+            width: 30,
+            height: 30,
+            flexShrink: 0,
+            borderRadius: 8,
+            display: "grid",
+            placeItems: "center",
+            background: "transparent",
+          }}
+        >
+          <AdminIcon name="trashcan" size={16} opacity={0.7} />
+        </button>
+      </div>
+
+      {/* 금액 */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+        <span
+          style={{
+            fontSize: 20,
+            fontWeight: 800,
+            fontVariantNumeric: "tabular-nums",
+            letterSpacing: -0.5,
+            color: isRevenue ? BLUE : RED,
+          }}
+        >
+          {formatWonSigned(txn.type, txn.amountKrw)}
+        </span>
+        {showFx && (
+          <span
+            style={{
+              fontSize: 11,
+              color: "var(--admin-ink-3)",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {fxText}
+          </span>
+        )}
+      </div>
+
+      {/* 하단: 거래일 · 분류 · 메모 */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+          fontSize: 12.5,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            color: "var(--admin-ink-3)",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          <span>{txn.transactionDate}</span>
+          {txn.category && (
+            <>
+              <span>·</span>
+              <span style={{ color: "var(--admin-ink-2)" }}>{txn.category}</span>
+            </>
+          )}
+        </div>
+        {txn.description && (
+          <div style={{ color: "var(--admin-ink-2)", lineHeight: 1.4 }}>
+            {txn.description}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

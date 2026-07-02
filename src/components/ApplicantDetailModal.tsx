@@ -596,6 +596,8 @@ const ApplicantDetailModal: React.FC<Props> = ({
                     }}
                   >
                     <video
+                      key={video.videoUrl}
+                      src={video.videoUrl}
                       controls
                       style={{
                         width: "100%",
@@ -604,7 +606,6 @@ const ApplicantDetailModal: React.FC<Props> = ({
                         background: "#000",
                       }}
                     >
-                      <source src={video.videoUrl} />
                       동영상을 지원하지 않는 브라우저입니다.
                     </video>
                   </div>

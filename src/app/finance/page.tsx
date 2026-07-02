@@ -22,6 +22,7 @@ import {
   getFinanceTransactions,
   Page,
   SOURCE_LABEL,
+  updateFinanceTransaction,
 } from "@/apis/finance";
 import { formatUsd, formatWon, formatWonSigned } from "@/utils/finance";
 
@@ -60,6 +61,7 @@ const FinancePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<FinanceTransaction | null>(null);
   const [delTarget, setDelTarget] = useState<FinanceTransaction | null>(null);
   const [toast, setToast] = useState("");
 
@@ -112,6 +114,12 @@ const FinancePage: React.FC = () => {
     setAddOpen(false);
     await refetchAll();
     flash("거래를 등록했어요.");
+  };
+
+  const handleEdited = async () => {
+    setEditTarget(null);
+    await refetchAll();
+    flash("거래를 수정했어요.");
   };
 
   const handleDelete = async () => {
@@ -252,7 +260,13 @@ const FinancePage: React.FC = () => {
         {/* (C) 거래 테이블 (모바일에서는 카드형) */}
         <div
           className={isMobile ? undefined : "zg-table-scroll"}
-          style={{ ...adminCardStyle, overflow: "hidden" }}
+          style={
+            isMobile
+              ? { ...adminCardStyle, overflow: "hidden" }
+              : // 데스크톱: 인라인 overflow:hidden 이 CSS overflow-x:auto 를 덮어써
+                // 표가 페이지 밖으로 밀려 오른쪽(삭제·수정 버튼)이 잘리던 문제 → 가로 스크롤 허용
+                { ...adminCardStyle, overflowX: "auto", overflowY: "hidden" }
+          }
         >
           <div
             className={isMobile ? undefined : "zg-table-inner"}
@@ -263,7 +277,7 @@ const FinancePage: React.FC = () => {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "110px 72px 104px 92px 168px 1fr 44px",
+                  gridTemplateColumns: "110px 72px 104px 92px 168px 1fr 76px",
                   gap: 12,
                   padding: "14px 22px",
                   background: "#fafbfc",
@@ -303,6 +317,7 @@ const FinancePage: React.FC = () => {
                     key={t.id}
                     txn={t}
                     first={i === 0}
+                    onEdit={() => setEditTarget(t)}
                     onDelete={() => setDelTarget(t)}
                   />
                 ) : (
@@ -310,6 +325,7 @@ const FinancePage: React.FC = () => {
                     key={t.id}
                     txn={t}
                     first={i === 0}
+                    onEdit={() => setEditTarget(t)}
                     onDelete={() => setDelTarget(t)}
                   />
                 )
@@ -337,7 +353,17 @@ const FinancePage: React.FC = () => {
       {addOpen && (
         <AddTransactionModal
           onClose={() => setAddOpen(false)}
-          onCreated={handleCreated}
+          onSaved={handleCreated}
+        />
+      )}
+
+      {/* (E-2) 수정 모달 */}
+      {editTarget && (
+        <AddTransactionModal
+          key={editTarget.id}
+          initial={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={handleEdited}
         />
       )}
 
@@ -466,8 +492,9 @@ const SummaryCard: React.FC<{
 const TxnRow: React.FC<{
   txn: FinanceTransaction;
   first: boolean;
+  onEdit: () => void;
   onDelete: () => void;
-}> = ({ txn, first, onDelete }) => {
+}> = ({ txn, first, onEdit, onDelete }) => {
   const isRevenue = txn.type === "REVENUE";
   const srcChip = SOURCE_CHIP[txn.source];
   const showFx =
@@ -483,7 +510,7 @@ const TxnRow: React.FC<{
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "110px 72px 104px 92px 168px 1fr 44px",
+        gridTemplateColumns: "110px 72px 104px 92px 168px 1fr 76px",
         gap: 12,
         padding: "14px 22px",
         alignItems: "center",
@@ -605,8 +632,27 @@ const TxnRow: React.FC<{
         {txn.description ?? "—"}
       </span>
 
-      {/* 삭제 */}
-      <span style={{ display: "flex", justifyContent: "flex-end" }}>
+      {/* 수정 / 삭제 */}
+      <span style={{ display: "flex", justifyContent: "flex-end", gap: 4 }}>
+        <button
+          onClick={onEdit}
+          title="수정"
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: 8,
+            display: "grid",
+            placeItems: "center",
+            background: "transparent",
+            transition: "background .15s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = BLUE_TINT)}
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.background = "transparent")
+          }
+        >
+          <AdminIcon name="edit" size={15} opacity={0.7} />
+        </button>
         <button
           onClick={onDelete}
           title="삭제"
@@ -635,8 +681,9 @@ const TxnRow: React.FC<{
 const TxnCard: React.FC<{
   txn: FinanceTransaction;
   first: boolean;
+  onEdit: () => void;
   onDelete: () => void;
-}> = ({ txn, first, onDelete }) => {
+}> = ({ txn, first, onEdit, onDelete }) => {
   const isRevenue = txn.type === "REVENUE";
   const srcChip = SOURCE_CHIP[txn.source];
   const showFx =
@@ -711,21 +758,36 @@ const TxnCard: React.FC<{
             {SOURCE_LABEL[txn.source]}
           </span>
         </div>
-        <button
-          onClick={onDelete}
-          title="삭제"
-          style={{
-            width: 30,
-            height: 30,
-            flexShrink: 0,
-            borderRadius: 8,
-            display: "grid",
-            placeItems: "center",
-            background: "transparent",
-          }}
-        >
-          <AdminIcon name="trashcan" size={16} opacity={0.7} />
-        </button>
+        <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+          <button
+            onClick={onEdit}
+            title="수정"
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              display: "grid",
+              placeItems: "center",
+              background: "transparent",
+            }}
+          >
+            <AdminIcon name="edit" size={15} opacity={0.7} />
+          </button>
+          <button
+            onClick={onDelete}
+            title="삭제"
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              display: "grid",
+              placeItems: "center",
+              background: "transparent",
+            }}
+          >
+            <AdminIcon name="trashcan" size={16} opacity={0.7} />
+          </button>
+        </div>
       </div>
 
       {/* 금액 */}
@@ -799,14 +861,36 @@ const emptyStyle: React.CSSProperties = {
 /* ───────────────────────── 수동 등록 모달 ───────────────────────── */
 const AddTransactionModal: React.FC<{
   onClose: () => void;
-  onCreated: () => void;
-}> = ({ onClose, onCreated }) => {
-  const [type, setType] = useState<FinanceType>("EXPENSE");
-  const [amount, setAmount] = useState(""); // 숫자만 보관
-  const [transactionDate, setTransactionDate] = useState(todayYmd());
-  const [cat, setCat] = useState<string>("마케팅");
-  const [customCat, setCustomCat] = useState("");
-  const [description, setDescription] = useState("");
+  onSaved: () => void;
+  /** 있으면 수정 모드 */
+  initial?: FinanceTransaction | null;
+}> = ({ onClose, onSaved, initial }) => {
+  const isEdit = !!initial;
+  // 기존 분류가 프리셋에 있으면 그대로, 없으면 "직접입력"으로
+  const initialCatKnown =
+    initial?.category != null &&
+    (EXPENSE_CATEGORIES as readonly string[]).includes(initial.category);
+
+  const [type, setType] = useState<FinanceType>(initial?.type ?? "EXPENSE");
+  const [amount, setAmount] = useState(
+    initial ? String(Math.round(initial.amountKrw)) : ""
+  ); // 숫자만 보관
+  const [transactionDate, setTransactionDate] = useState(
+    initial?.transactionDate ?? todayYmd()
+  );
+  const [cat, setCat] = useState<string>(
+    initial
+      ? initialCatKnown
+        ? (initial.category as string)
+        : initial.category != null
+        ? "직접입력"
+        : "마케팅"
+      : "마케팅"
+  );
+  const [customCat, setCustomCat] = useState(
+    initial && !initialCatKnown && initial.category != null ? initial.category : ""
+  );
+  const [description, setDescription] = useState(initial?.description ?? "");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -828,18 +912,27 @@ const AddTransactionModal: React.FC<{
           ? customCat.trim() || null
           : cat
         : null;
+    const body = {
+      type,
+      amount: amountNum,
+      transactionDate,
+      category,
+      description: description.trim() || null,
+    };
     setSaving(true);
     try {
-      await createFinanceTransaction({
-        type,
-        amount: amountNum,
-        transactionDate,
-        category,
-        description: description.trim() || null,
-      });
-      onCreated();
+      if (isEdit && initial) {
+        await updateFinanceTransaction(initial.id, body);
+      } else {
+        await createFinanceTransaction(body);
+      }
+      onSaved();
     } catch {
-      setErr("등록에 실패했어요. 다시 시도해주세요.");
+      setErr(
+        isEdit
+          ? "수정에 실패했어요. 다시 시도해주세요."
+          : "등록에 실패했어요. 다시 시도해주세요."
+      );
       setSaving(false);
     }
   };
@@ -868,7 +961,7 @@ const AddTransactionModal: React.FC<{
           }}
         >
           <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
-            비용 / 수익 추가
+            {isEdit ? "비용 / 수익 수정" : "비용 / 수익 추가"}
           </h2>
           <button
             onClick={onClose}

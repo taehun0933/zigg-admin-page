@@ -98,6 +98,19 @@ export async function createFinanceTransaction(
   }
 }
 
+export async function updateFinanceTransaction(
+  id: number,
+  body: CreateFinanceTxnBody
+): Promise<FinanceTransaction> {
+  try {
+    const res = await apiClient.patch(`/finance/transactions/${id}`, body);
+    return res.data;
+  } catch (e) {
+    handleApiError(e);
+    throw e;
+  }
+}
+
 export async function deleteFinanceTransaction(id: number): Promise<void> {
   try {
     await apiClient.delete(`/finance/transactions/${id}`); // 204

@@ -28,6 +28,7 @@ const NAV: NavItem[] = [
   { id: "voices", label: "고객 목소리함", icon: "mail", path: "/customerInquiry" },
   { id: "trainers", label: "트레이너 관리", icon: "people", path: "/trainer" },
   { id: "finance", label: "비용 관리", icon: "wallet", path: "/finance" },
+  { id: "assets", label: "자산관리", icon: "document", path: "/asset" },
 ];
 
 const SIDEBAR_KEY = "admin_sidebar_collapsed";

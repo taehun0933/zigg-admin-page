@@ -87,23 +87,26 @@ const TermsTab: React.FC = () => {
     }
     setSaving(true);
     try {
+      const body = {
+        title: form.title.trim(),
+        content: form.content,
+        isRequired: form.isRequired,
+        displayOrder: form.displayOrder,
+      };
       if (form.termsId === null) {
-        await createAdminTerms({
-          title: form.title.trim(),
-          content: form.content,
-          isRequired: form.isRequired,
-          displayOrder: form.displayOrder,
-        });
+        const created = await createAdminTerms(body);
+        setTerms((prev) =>
+          [...prev, created].sort((a, b) => a.displayOrder - b.displayOrder)
+        );
       } else {
-        await updateAdminTerms(form.termsId, {
-          title: form.title.trim(),
-          content: form.content,
-          isRequired: form.isRequired,
-          displayOrder: form.displayOrder,
-        });
+        const updated = await updateAdminTerms(form.termsId, body);
+        setTerms((prev) =>
+          prev
+            .map((t) => (t.termsId === updated.termsId ? updated : t))
+            .sort((a, b) => a.displayOrder - b.displayOrder)
+        );
       }
       setForm(null);
-      load();
     } catch {
       alert("저장에 실패했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
@@ -115,7 +118,7 @@ const TermsTab: React.FC = () => {
     if (!window.confirm(`'${t.title}' 약관을 삭제할까요?`)) return;
     try {
       await deleteAdminTerms(t.termsId);
-      load();
+      setTerms((prev) => prev.filter((it) => it.termsId !== t.termsId));
     } catch {
       alert("삭제에 실패했어요.");
     }
@@ -344,9 +347,9 @@ const FeedbackTab: React.FC = () => {
     if (!name) return;
     try {
       const count = items.filter((it) => it.category === category).length;
-      await createAdminFeedbackItem({ category, name, displayOrder: count + 1 });
+      const created = await createAdminFeedbackItem({ category, name, displayOrder: count + 1 });
+      setItems((prev) => [...prev, created]);
       setNewNames((prev) => ({ ...prev, [category]: "" }));
-      load();
     } catch {
       alert("항목 추가에 실패했어요.");
     }
@@ -359,9 +362,11 @@ const FeedbackTab: React.FC = () => {
       return;
     }
     try {
-      await updateAdminFeedbackItem(item.feedbackItemId, { name });
+      const updated = await updateAdminFeedbackItem(item.feedbackItemId, { name });
+      setItems((prev) =>
+        prev.map((it) => (it.feedbackItemId === item.feedbackItemId ? updated : it))
+      );
       setEditingId(null);
-      load();
     } catch {
       alert("항목 수정에 실패했어요.");
     }
@@ -371,7 +376,7 @@ const FeedbackTab: React.FC = () => {
     if (!window.confirm(`'${item.name}' 항목을 삭제할까요?`)) return;
     try {
       await deleteAdminFeedbackItem(item.feedbackItemId);
-      load();
+      setItems((prev) => prev.filter((it) => it.feedbackItemId !== item.feedbackItemId));
     } catch {
       alert("항목 삭제에 실패했어요.");
     }

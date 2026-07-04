@@ -10,6 +10,8 @@
  * imageKey 에 박힌 host 를 기준으로 매핑한다. 로컬 콘텐츠 host 는 dev 로 매핑.
  */
 
+import type { SyntheticEvent } from "react";
+
 const DEV_RESIZE =
   process.env.NEXT_PUBLIC_IMG_RESIZE_CDN_DEV ?? "https://d1czedzmq6m24y.cloudfront.net";
 const PROD_RESIZE =
@@ -55,4 +57,20 @@ export function cdnImage(
   if (height) out.searchParams.set("height", String(height));
   if (format) out.searchParams.set("format", format);
   return out.toString();
+}
+
+/**
+ * <img onError> 핸들러. 리사이즈 CDN 이 실패(502/미변환 등)하면 원본 콘텐츠 CDN
+ * URL 로 1회 되돌린다. 리사이즈 CDN 을 못 읽어도 원본 이미지는 뜨게 하는 안전장치.
+ * (원본까지 실패하면 loop 방지 위해 그대로 둠 → 깨진 이미지)
+ *
+ * @example onError={cdnImgError(applicant.images[0].imageKey)}
+ */
+export function cdnImgError(originalUrl: string | null | undefined) {
+  return (e: SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (!originalUrl || img.dataset.fellBack === "1") return;
+    img.dataset.fellBack = "1";
+    img.src = originalUrl;
+  };
 }

@@ -10,7 +10,7 @@ import {
 } from "@/apis/feedback";
 import { AuditionFeedback, AuditionProfileType } from "@/types/audition";
 import { countryNameKo } from "@/utils/countryName";
-import { cdnImage } from "@/utils/cdnImage";
+import { cdnImage, cdnImgError } from "@/utils/cdnImage";
 import AdminIcon from "@/components/admin/AdminIcon";
 
 interface Props {
@@ -444,6 +444,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
                 {photo ? (
                   <img
                     src={cdnImage(photo, { width: 480 })}
+                    onError={cdnImgError(photo)}
                     alt={a.name}
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                   />
@@ -667,6 +668,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
                   >
                     <img
                       src={cdnImage(img.imageKey, { width: 500 })}
+                      onError={cdnImgError(img.imageKey)}
                       alt={`${a.name} ${i + 1}`}
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     />

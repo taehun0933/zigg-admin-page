@@ -24,7 +24,7 @@ const NAV: NavItem[] = [
   { id: "boards", label: "게시판 관리", icon: "community", activeIcon: "community_activated", path: "/board" },
   { id: "notices", label: "공지사항", icon: "speaker", activeIcon: "speaker_activated", path: "/notice" },
   { id: "notify", label: "알림 발송", icon: "bell", path: "/notification" },
-  { id: "tickets", label: "티켓 수동 지급", icon: "ticket", path: "/ticket" },
+  { id: "tickets", label: "티켓 관리", icon: "ticket", path: "/ticket" },
   { id: "voices", label: "고객 목소리함", icon: "mail", path: "/customerInquiry" },
   { id: "trainers", label: "트레이너 관리", icon: "people", path: "/trainer" },
   { id: "finance", label: "비용 관리", icon: "wallet", path: "/finance" },

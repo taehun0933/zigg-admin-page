@@ -1,13 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import PageShell, { adminCardStyle, btnPrimary, btnSecondary, inputStyle } from "@/components/admin/PageShell";
 import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
 import {
   searchUsersByNickname,
   grantTickets,
+  getUserTicketSummary,
+  getTicketPurchases,
   UserSearchResult,
+  UserTicketSummary,
+  TicketLogType,
+  TicketPurchase,
 } from "@/apis/ticket";
 
 const REASON_OPTIONS = [
@@ -17,16 +22,22 @@ const REASON_OPTIONS = [
   "기타",
 ];
 
-interface RecentGrant {
-  date: string;
-  user: string;
-  amount: number;
-  reason: string;
-}
+const PAGE_SIZE = 20;
+
+const LOG_META: Record<TicketLogType, { label: string; sign: "+" | "-"; color: string }> = {
+  PURCHASE: { label: "구매", sign: "+", color: "var(--admin-blue)" },
+  ADMIN_ADJUSTMENT: { label: "관리자 지급", sign: "+", color: "#1f8a52" },
+  AUDITION_CANCEL: { label: "오디션 취소 환급", sign: "+", color: "#1f8a52" },
+  REFUND: { label: "환불", sign: "-", color: "#cc3333" },
+  USE: { label: "사용", sign: "-", color: "var(--admin-ink-2)" },
+};
+
+const fmtDate = (iso: string) => iso.replace("T", " ").slice(0, 16);
 
 const TicketPage: React.FC = () => {
   const ready = useAdminAuthGuard();
 
+  // ── 지급 ─────────────────────────────────────────────
   const [searchNickname, setSearchNickname] = useState("");
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
@@ -37,7 +48,49 @@ const TicketPage: React.FC = () => {
   const [granting, setGranting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [recent, setRecent] = useState<RecentGrant[]>([]);
+
+  // ── 선택 유저 티켓 요약 ───────────────────────────────
+  const [summary, setSummary] = useState<UserTicketSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+
+  // ── 결제내역 목록 ─────────────────────────────────────
+  const [purchaseQuery, setPurchaseQuery] = useState("");
+  const [purchases, setPurchases] = useState<TicketPurchase[]>([]);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [loadingPurchases, setLoadingPurchases] = useState(false);
+
+  const loadSummary = useCallback(async (userId: number) => {
+    setSummaryLoading(true);
+    try {
+      setSummary(await getUserTicketSummary(userId));
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedUser) loadSummary(selectedUser.userId);
+    else setSummary(null);
+  }, [selectedUser, loadSummary]);
+
+  const loadPurchases = useCallback(async (nextPage: number, query: string) => {
+    setLoadingPurchases(true);
+    try {
+      const res = await getTicketPurchases(nextPage, query, PAGE_SIZE);
+      setPurchases(res.content);
+      setPage(res.number);
+      setTotalPages(res.totalPages);
+      setTotalElements(res.totalElements);
+    } finally {
+      setLoadingPurchases(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPurchases(0, "");
+  }, [loadPurchases]);
 
   const handleSearch = async () => {
     const q = searchNickname.trim();
@@ -70,22 +123,11 @@ const TicketPage: React.FC = () => {
       const finalReason = memo.trim() ? `${reason} — ${memo.trim()}` : reason;
       const res = await grantTickets(selectedUser.userNickname, amount, finalReason);
       setSuccess(res.message);
-      setRecent((prev) =>
-        [
-          {
-            date: new Date().toISOString().replace("T", " ").slice(0, 16),
-            user: selectedUser.userNickname,
-            amount,
-            reason,
-          },
-          ...prev,
-        ].slice(0, 10),
-      );
-      setSelectedUser(null);
-      setSearchResults([]);
-      setSearchNickname("");
       setAmount(1);
       setMemo("");
+      // 지급 후 요약·결제내역 갱신
+      loadSummary(selectedUser.userId);
+      loadPurchases(page, purchaseQuery);
     } catch {
       setError("티켓 지급에 실패했습니다.");
     } finally {
@@ -98,14 +140,14 @@ const TicketPage: React.FC = () => {
   return (
     <AdminShell>
       <PageShell
-        eyebrow="티켓 수동 지급"
-        title="유저에게 티켓 직접 지급"
-        subtitle="결제 오류·이벤트 보상 등의 경우 닉네임으로 티켓을 지급합니다."
+        eyebrow="티켓 관리"
+        title="티켓 지급 · 결제내역"
+        subtitle="유저에게 티켓을 직접 지급하고, 결제(구매) 내역을 조회합니다."
       >
         <div className="zg-split" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          {/* New grant */}
+          {/* 지급 */}
           <div style={{ ...adminCardStyle, padding: 22 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>새 지급</div>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>티켓 지급</div>
 
             <Field label="대상 유저 닉네임">
               <div style={{ display: "flex", gap: 8 }}>
@@ -152,37 +194,11 @@ const TicketPage: React.FC = () => {
                         textAlign: "left",
                       }}
                     >
-                      <div
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: "50%",
-                          background: u.profileImageUrl ? "transparent" : "#e8e8ee",
-                          overflow: "hidden",
-                          display: "grid",
-                          placeItems: "center",
-                          fontSize: 12,
-                          color: "var(--admin-ink-2)",
-                        }}
-                      >
-                        {u.profileImageUrl ? (
-                          <img
-                            src={u.profileImageUrl}
-                            alt=""
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          />
-                        ) : (
-                          "?"
-                        )}
-                      </div>
+                      <Avatar url={u.profileImageUrl} size={32} />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>
-                          {u.userNickname}
-                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{u.userNickname}</div>
                         {u.userName && (
-                          <div style={{ fontSize: 11, color: "var(--admin-ink-3)" }}>
-                            {u.userName}
-                          </div>
+                          <div style={{ fontSize: 11, color: "var(--admin-ink-3)" }}>{u.userName}</div>
                         )}
                       </div>
                     </button>
@@ -201,39 +217,12 @@ const TicketPage: React.FC = () => {
                     gap: 10,
                   }}
                 >
-                  <div
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: "50%",
-                      background: "#e8e8ee",
-                      overflow: "hidden",
-                      display: "grid",
-                      placeItems: "center",
-                    }}
-                  >
-                    {selectedUser.profileImageUrl ? (
-                      <img
-                        src={selectedUser.profileImageUrl}
-                        alt=""
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
-                    ) : (
-                      "?"
-                    )}
-                  </div>
+                  <Avatar url={selectedUser.profileImageUrl} size={36} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>
-                      {selectedUser.userNickname}
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--admin-ink-3)" }}>
-                      ID #{selectedUser.userId}
-                    </div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{selectedUser.userNickname}</div>
+                    <div style={{ fontSize: 11, color: "var(--admin-ink-3)" }}>ID #{selectedUser.userId}</div>
                   </div>
-                  <button
-                    onClick={() => setSelectedUser(null)}
-                    style={{ fontSize: 12, color: "var(--admin-ink-2)" }}
-                  >
+                  <button onClick={() => setSelectedUser(null)} style={{ fontSize: 12, color: "var(--admin-ink-2)" }}>
                     × 해제
                   </button>
                 </div>
@@ -272,34 +261,8 @@ const TicketPage: React.FC = () => {
               />
             </Field>
 
-            {error && (
-              <div
-                style={{
-                  marginTop: 8,
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  background: "#ffeaea",
-                  color: "#cc3333",
-                  fontSize: 12,
-                }}
-              >
-                {error}
-              </div>
-            )}
-            {success && (
-              <div
-                style={{
-                  marginTop: 8,
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  background: "var(--admin-good-tint)",
-                  color: "#1f8a52",
-                  fontSize: 12,
-                }}
-              >
-                {success}
-              </div>
-            )}
+            {error && <Banner tone="error">{error}</Banner>}
+            {success && <Banner tone="good">{success}</Banner>}
 
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
               <button
@@ -316,64 +279,188 @@ const TicketPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Recent grants (session-local) */}
-          <div style={{ ...adminCardStyle, padding: 0 }}>
-            <div
-              style={{
-                padding: "18px 22px",
-                borderBottom: "1px solid var(--admin-border)",
-              }}
-            >
-              <div style={{ fontSize: 15, fontWeight: 700 }}>이번 세션 지급 내역</div>
+          {/* 선택 유저 티켓 현황 */}
+          <div style={{ ...adminCardStyle, padding: 0, display: "flex", flexDirection: "column" }}>
+            <div style={{ padding: "18px 22px", borderBottom: "1px solid var(--admin-border)" }}>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>유저 티켓 현황</div>
               <div style={{ fontSize: 12, color: "var(--admin-ink-3)", marginTop: 4 }}>
-                현재 브라우저에서 발생한 지급만 표시됩니다.
+                {selectedUser ? `${selectedUser.userNickname} 님의 보유·구매·사용 내역` : "지급할 유저를 선택하면 표시됩니다."}
               </div>
             </div>
-            {recent.length === 0 ? (
-              <div
-                style={{
-                  padding: 40,
-                  textAlign: "center",
-                  color: "var(--admin-ink-3)",
-                  fontSize: 13,
-                }}
-              >
-                아직 지급 내역이 없습니다.
-              </div>
+
+            {!selectedUser ? (
+              <Empty>선택된 유저가 없습니다.</Empty>
+            ) : summaryLoading ? (
+              <Empty>불러오는 중…</Empty>
+            ) : !summary ? (
+              <Empty>현황을 불러오지 못했습니다.</Empty>
             ) : (
-              recent.map((t, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "150px 1fr 50px 1fr",
-                    gap: 10,
-                    padding: "12px 22px",
-                    borderTop: i ? "1px solid var(--admin-border)" : "none",
-                    fontSize: 12,
-                    alignItems: "center",
-                  }}
-                >
-                  <span
-                    style={{ color: "var(--admin-ink-3)", fontVariantNumeric: "tabular-nums" }}
-                  >
-                    {t.date}
-                  </span>
-                  <span style={{ fontWeight: 600 }}>{t.user}</span>
-                  <span
-                    style={{
-                      fontWeight: 700,
-                      color: "var(--admin-blue)",
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    +{t.amount}
-                  </span>
-                  <span style={{ color: "var(--admin-ink-2)" }}>{t.reason}</span>
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1, background: "var(--admin-border)" }}>
+                  <Stat label="현재 보유" value={summary.remainAmount} accent="var(--admin-blue)" />
+                  <Stat label="누적 구매" value={summary.purchasedTotal} />
+                  <Stat label="누적 사용" value={summary.usedTotal} />
                 </div>
-              ))
+                <div style={{ flex: 1, overflowY: "auto", maxHeight: 360 }}>
+                  {summary.logs.length === 0 ? (
+                    <Empty>티켓 내역이 없습니다.</Empty>
+                  ) : (
+                    summary.logs.map((l, i) => {
+                      const meta = LOG_META[l.type];
+                      return (
+                        <div
+                          key={l.logId}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr auto",
+                            gap: 8,
+                            padding: "11px 22px",
+                            borderTop: i ? "1px solid var(--admin-border)" : "none",
+                            alignItems: "center",
+                          }}
+                        >
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 12.5, fontWeight: 600 }}>
+                              {meta.label}
+                              <span style={{ color: "var(--admin-ink-3)", fontWeight: 400 }}> · {l.productName}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: "var(--admin-ink-3)", marginTop: 2 }}>{fmtDate(l.createdAt)}</div>
+                          </div>
+                          <span style={{ fontWeight: 700, color: meta.color, fontVariantNumeric: "tabular-nums" }}>
+                            {meta.sign}{l.amount}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </>
             )}
           </div>
+        </div>
+
+        {/* 결제내역 */}
+        <div style={{ ...adminCardStyle, padding: 0, marginTop: 14 }}>
+          <div
+            style={{
+              padding: "18px 22px",
+              borderBottom: "1px solid var(--admin-border)",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>티켓 결제내역</div>
+              <div style={{ fontSize: 12, color: "var(--admin-ink-3)", marginTop: 4 }}>
+                인앱 구매(PURCHASE) 기준 · 총 {totalElements.toLocaleString()}건
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                value={purchaseQuery}
+                onChange={(e) => setPurchaseQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && loadPurchases(0, purchaseQuery)}
+                placeholder="닉네임 검색"
+                style={{ ...inputStyle, width: 200 }}
+              />
+              <button
+                onClick={() => loadPurchases(0, purchaseQuery)}
+                disabled={loadingPurchases}
+                style={{ ...btnSecondary, height: 40, whiteSpace: "nowrap" }}
+              >
+                {loadingPurchases ? "검색…" : "검색"}
+              </button>
+            </div>
+          </div>
+
+          {/* header */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "2fr 2fr 80px 160px",
+              gap: 10,
+              padding: "10px 22px",
+              fontSize: 11,
+              fontWeight: 600,
+              color: "var(--admin-ink-3)",
+              borderBottom: "1px solid var(--admin-border)",
+            }}
+          >
+            <span>유저</span>
+            <span>상품</span>
+            <span style={{ textAlign: "right" }}>구매 매수</span>
+            <span style={{ textAlign: "right" }}>결제일시</span>
+          </div>
+
+          {loadingPurchases ? (
+            <Empty>불러오는 중…</Empty>
+          ) : purchases.length === 0 ? (
+            <Empty>결제내역이 없습니다.</Empty>
+          ) : (
+            purchases.map((p, i) => (
+              <div
+                key={p.logId}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "2fr 2fr 80px 160px",
+                  gap: 10,
+                  padding: "12px 22px",
+                  borderTop: i ? "1px solid var(--admin-border)" : "none",
+                  fontSize: 12.5,
+                  alignItems: "center",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                  <Avatar url={p.profileImageUrl} size={28} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600 }}>{p.nickname ?? "-"}</div>
+                    {p.userName && <div style={{ fontSize: 11, color: "var(--admin-ink-3)" }}>{p.userName}</div>}
+                  </div>
+                </div>
+                <span style={{ color: "var(--admin-ink-2)" }}>{p.productName}</span>
+                <span style={{ textAlign: "right", fontWeight: 700, color: "var(--admin-blue)", fontVariantNumeric: "tabular-nums" }}>
+                  {p.amount}
+                </span>
+                <span style={{ textAlign: "right", color: "var(--admin-ink-3)", fontVariantNumeric: "tabular-nums" }}>
+                  {fmtDate(p.createdAt)}
+                </span>
+              </div>
+            ))
+          )}
+
+          {/* pagination */}
+          {totalPages > 1 && (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: 12,
+                padding: "14px 22px",
+                borderTop: "1px solid var(--admin-border)",
+              }}
+            >
+              <button
+                onClick={() => loadPurchases(page - 1, purchaseQuery)}
+                disabled={page <= 0 || loadingPurchases}
+                style={{ ...btnSecondary, height: 34, opacity: page <= 0 ? 0.4 : 1 }}
+              >
+                이전
+              </button>
+              <span style={{ fontSize: 12.5, color: "var(--admin-ink-2)", fontVariantNumeric: "tabular-nums" }}>
+                {page + 1} / {totalPages}
+              </span>
+              <button
+                onClick={() => loadPurchases(page + 1, purchaseQuery)}
+                disabled={page >= totalPages - 1 || loadingPurchases}
+                style={{ ...btnSecondary, height: 34, opacity: page >= totalPages - 1 ? 0.4 : 1 }}
+              >
+                다음
+              </button>
+            </div>
+          )}
         </div>
       </PageShell>
     </AdminShell>
@@ -383,6 +470,53 @@ const TicketPage: React.FC = () => {
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div style={{ marginBottom: 16 }}>
     <div style={{ fontSize: 12, fontWeight: 600, color: "var(--admin-ink-2)", marginBottom: 8 }}>{label}</div>
+    {children}
+  </div>
+);
+
+const Avatar: React.FC<{ url: string | null; size: number }> = ({ url, size }) => (
+  <div
+    style={{
+      width: size,
+      height: size,
+      borderRadius: "50%",
+      background: url ? "transparent" : "#e8e8ee",
+      overflow: "hidden",
+      display: "grid",
+      placeItems: "center",
+      fontSize: 12,
+      color: "var(--admin-ink-2)",
+      flexShrink: 0,
+    }}
+  >
+    {url ? <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "?"}
+  </div>
+);
+
+const Stat: React.FC<{ label: string; value: number; accent?: string }> = ({ label, value, accent }) => (
+  <div style={{ background: "#fff", padding: "16px 18px", textAlign: "center" }}>
+    <div style={{ fontSize: 22, fontWeight: 800, color: accent ?? "var(--admin-ink)", fontVariantNumeric: "tabular-nums" }}>
+      {value}
+    </div>
+    <div style={{ fontSize: 11, color: "var(--admin-ink-3)", marginTop: 2 }}>{label}</div>
+  </div>
+);
+
+const Empty: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div style={{ padding: 40, textAlign: "center", color: "var(--admin-ink-3)", fontSize: 13 }}>{children}</div>
+);
+
+const Banner: React.FC<{ tone: "error" | "good"; children: React.ReactNode }> = ({ tone, children }) => (
+  <div
+    style={{
+      marginTop: 8,
+      padding: "10px 12px",
+      borderRadius: 8,
+      background: tone === "error" ? "#ffeaea" : "var(--admin-good-tint)",
+      color: tone === "error" ? "#cc3333" : "#1f8a52",
+      fontSize: 12,
+    }}
+  >
     {children}
   </div>
 );

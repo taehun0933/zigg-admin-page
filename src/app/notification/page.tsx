@@ -268,7 +268,7 @@ const NotificationPage: React.FC = () => {
                   border: "1px solid #cce8d7",
                 }}
               >
-                전체 유저에게 발송 요청을 보냈습니다.
+                발송 요청이 접수되었습니다. 전체 유저 발송이 백그라운드에서 진행되며 완료까지 다소 시간이 걸릴 수 있습니다.
               </div>
             )}
 
@@ -283,7 +283,7 @@ const NotificationPage: React.FC = () => {
               }}
             >
               <span style={{ fontSize: 12, color: "var(--admin-ink-3)" }}>
-                전체 유저에게 즉시 발송됩니다. 발송 후 취소 불가.
+                전체 유저에게 순차 발송되어 완료까지 다소 시간이 걸립니다. 발송 후 취소 불가.
               </span>
               <button
                 style={{
@@ -481,6 +481,18 @@ const NotificationPage: React.FC = () => {
             </h2>
             <div style={{ fontSize: 12, fontWeight: 600, color: isProd ? "#cc3333" : "#cc7a00" }}>
               현재 환경: {isProd ? "Prod 서버" : "Dev 서버"}
+            </div>
+            <div
+              style={{
+                padding: "10px 12px",
+                fontSize: 12,
+                borderRadius: 8,
+                background: "var(--admin-blue-tint)",
+                color: "var(--admin-blue)",
+                lineHeight: 1.5,
+              }}
+            >
+              모든 유저에게 알림을 발송하므로 완료까지 다소 시간이 걸립니다. 발송 요청 후 백그라운드에서 처리됩니다.
             </div>
             <div
               style={{

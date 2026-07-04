@@ -38,6 +38,9 @@ const fmtDate = (iso: string) => iso.replace("T", " ").slice(0, 16);
 const TicketPage: React.FC = () => {
   const ready = useAdminAuthGuard();
 
+  // ── UI ───────────────────────────────────────────────
+  const [tab, setTab] = useState<"grant" | "pay">("grant");
+
   // ── 지급 ─────────────────────────────────────────────
   const [searchNickname, setSearchNickname] = useState("");
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
@@ -145,6 +148,52 @@ const TicketPage: React.FC = () => {
         title="티켓 지급 · 결제내역"
         subtitle="유저에게 티켓을 직접 지급하고, 결제(구매) 내역을 조회합니다."
       >
+        {/* 서브탭 */}
+        <div
+          style={{
+            display: "flex",
+            gap: 18,
+            margin: "0 0 16px",
+            borderBottom: "1px solid var(--admin-border)",
+          }}
+        >
+          {[
+            { key: "grant" as const, label: "티켓 지급" },
+            { key: "pay" as const, label: "결제내역", count: totalElements },
+          ].map((t) => {
+            const on = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                style={{
+                  position: "relative",
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  color: on ? "var(--admin-ink)" : "var(--admin-ink-3)",
+                  padding: "11px 2px",
+                }}
+              >
+                {t.label}
+                {t.count != null && (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--admin-ink-3)", marginLeft: 5 }}>
+                    {t.count.toLocaleString()}
+                  </span>
+                )}
+                {on && (
+                  <span
+                    style={{
+                      position: "absolute", left: 0, right: 0, bottom: -1,
+                      height: 2, background: "var(--admin-blue)", borderRadius: 2,
+                    }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {tab === "grant" && (
         <div className="zg-split" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           {/* 지급 */}
           <div style={{ ...adminCardStyle, padding: 22 }}>
@@ -339,10 +388,13 @@ const TicketPage: React.FC = () => {
             )}
           </div>
         </div>
+        )}
 
-        {/* 결제내역 */}
-        <div style={{ ...adminCardStyle, padding: 0, marginTop: 14 }}>
+        {tab === "pay" && (
+          /* 결제내역 */
+        <div style={{ ...adminCardStyle, padding: 0, marginTop: 0 }}>
           <div
+            className="zg-pay-toolbar"
             style={{
               padding: "18px 22px",
               borderBottom: "1px solid var(--admin-border)",
@@ -378,9 +430,10 @@ const TicketPage: React.FC = () => {
 
           {/* header */}
           <div
+            className="zg-pay-head"
             style={{
               display: "grid",
-              gridTemplateColumns: "2fr 2fr 80px 160px",
+              gridTemplateColumns: "2fr 2fr 90px 150px",
               gap: 10,
               padding: "10px 22px",
               fontSize: 11,
@@ -401,33 +454,61 @@ const TicketPage: React.FC = () => {
             <Empty>결제내역이 없습니다.</Empty>
           ) : (
             purchases.map((p, i) => (
-              <div
-                key={p.logId}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "2fr 2fr 80px 160px",
-                  gap: 10,
-                  padding: "12px 22px",
-                  borderTop: i ? "1px solid var(--admin-border)" : "none",
-                  fontSize: 12.5,
-                  alignItems: "center",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                  <UserAvatar url={p.profileImageUrl} size={28} />
+              <React.Fragment key={p.logId}>
+                {/* 데스크탑: grid 행 */}
+                <div
+                  className="zg-pay-row"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "2fr 2fr 90px 150px",
+                    gap: 10,
+                    padding: "12px 22px",
+                    borderTop: i ? "1px solid var(--admin-border)" : "none",
+                    fontSize: 12.5,
+                    alignItems: "center",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                    <UserAvatar url={p.profileImageUrl} size={28} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600 }}>{p.nickname ?? "-"}</div>
+                      {p.userName && <div style={{ fontSize: 11, color: "var(--admin-ink-3)" }}>{p.userName}</div>}
+                    </div>
+                  </div>
+                  <span style={{ color: "var(--admin-ink-2)" }}>{p.productName}</span>
+                  <span style={{ textAlign: "right", fontWeight: 700, color: "var(--admin-blue)", fontVariantNumeric: "tabular-nums" }}>
+                    {p.amount}
+                  </span>
+                  <span style={{ textAlign: "right", color: "var(--admin-ink-3)", fontVariantNumeric: "tabular-nums" }}>
+                    {fmtDate(p.createdAt)}
+                  </span>
+                </div>
+
+                {/* 모바일: 카드형 행 */}
+                <div
+                  className="zg-pay-card"
+                  style={{
+                    gridTemplateColumns: "auto 1fr auto",
+                    gap: 12,
+                    padding: "13px 16px",
+                    borderTop: i ? "1px solid var(--admin-border)" : "none",
+                    alignItems: "center",
+                  }}
+                >
+                  <UserAvatar url={p.profileImageUrl} size={34} />
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 600 }}>{p.nickname ?? "-"}</div>
-                    {p.userName && <div style={{ fontSize: 11, color: "var(--admin-ink-3)" }}>{p.userName}</div>}
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{p.nickname ?? "-"}</div>
+                    {p.userName && <div style={{ fontSize: 11, color: "var(--admin-ink-3)", marginTop: 1 }}>{p.userName}</div>}
+                    <div style={{ fontSize: 11, color: "var(--admin-ink-3)", marginTop: 2 }}>{p.productName}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <span style={{ fontWeight: 700, color: "var(--admin-blue)", fontVariantNumeric: "tabular-nums" }}>{p.amount}</span>
+                    <span style={{ display: "block", fontSize: 10.5, color: "var(--admin-ink-3)", marginTop: 3, fontVariantNumeric: "tabular-nums" }}>
+                      {fmtDate(p.createdAt).slice(5)}
+                    </span>
                   </div>
                 </div>
-                <span style={{ color: "var(--admin-ink-2)" }}>{p.productName}</span>
-                <span style={{ textAlign: "right", fontWeight: 700, color: "var(--admin-blue)", fontVariantNumeric: "tabular-nums" }}>
-                  {p.amount}
-                </span>
-                <span style={{ textAlign: "right", color: "var(--admin-ink-3)", fontVariantNumeric: "tabular-nums" }}>
-                  {fmtDate(p.createdAt)}
-                </span>
-              </div>
+              </React.Fragment>
             ))
           )}
 
@@ -463,6 +544,7 @@ const TicketPage: React.FC = () => {
             </div>
           )}
         </div>
+        )}
       </PageShell>
     </AdminShell>
   );

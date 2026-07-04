@@ -124,3 +124,21 @@ textarea::placeholder {
   width: 100% !important;
   max-width: min(var(--zg-modal-w, 420px), calc(100vw - 24px)) !important;
 }
+
+/* =========================================================
+   결제내역 테이블: 넓으면 grid 행, 좁으면 카드형 행
+   ========================================================= */
+
+/* 기본(데스크탑): 카드형 숨김 */
+.zg-pay-card { display: none; }
+
+@media (max-width: 720px) {
+  /* 컬럼 헤더 & grid 행 숨기고 카드형만 표시 */
+  .zg-pay-head { display: none !important; }
+  .zg-pay-row  { display: none !important; }
+  .zg-pay-card { display: grid !important; }
+
+  /* 툴바(제목+검색)를 세로로 */
+  .zg-pay-toolbar { flex-direction: column; align-items: stretch !important; }
+  .zg-pay-toolbar input { width: 100% !important; }
+}

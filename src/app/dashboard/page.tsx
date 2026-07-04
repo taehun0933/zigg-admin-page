@@ -713,8 +713,8 @@ const DashboardPage: React.FC = () => {
             onClick={() => router.push("/notification")}
           />
           <QuickAction
-            label="티켓 수동 지급"
-            desc="결제 오류 유저에게 직접 티켓 지급"
+            label="티켓 관리"
+            desc="티켓 지급 · 결제내역 조회"
             icon="ticket"
             tint="#fff4e0"
             onClick={() => router.push("/ticket")}

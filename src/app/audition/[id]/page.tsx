@@ -19,6 +19,7 @@ import {
 } from "@/apis/audition";
 import { AuditionProfileType } from "@/types/audition";
 import { countryNameKo } from "@/utils/countryName";
+import { cdnImage } from "@/utils/cdnImage";
 import { Audition } from "@/app/audition/page";
 
 const nfmt = (n: number) => n.toLocaleString("ko-KR");
@@ -779,7 +780,7 @@ const ApplicantCard: React.FC<ApplicantCardProps> = ({ applicant, idx, onClick, 
         >
           {photo ? (
             <img
-              src={photo}
+              src={cdnImage(photo, { width: 400 })}
               alt={applicant.name}
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
@@ -1215,7 +1216,7 @@ const BookmarkRail: React.FC<BookmarkRailProps> = ({
                 >
                   {a.images?.[0]?.imageKey ? (
                     <img
-                      src={a.images[0].imageKey}
+                      src={cdnImage(a.images[0].imageKey, { width: 96 })}
                       alt={a.name}
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     />

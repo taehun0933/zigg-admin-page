@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import PageShell, { adminCardStyle, btnPrimary, btnSecondary, inputStyle } from "@/components/admin/PageShell";
 import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
+import UserAvatar from "@/components/admin/UserAvatar";
 import {
   searchUsersByNickname,
   grantTickets,
@@ -194,7 +195,7 @@ const TicketPage: React.FC = () => {
                         textAlign: "left",
                       }}
                     >
-                      <Avatar url={u.profileImageUrl} size={32} />
+                      <UserAvatar url={u.profileImageUrl} size={32} />
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{u.userNickname}</div>
                         {u.userName && (
@@ -217,7 +218,7 @@ const TicketPage: React.FC = () => {
                     gap: 10,
                   }}
                 >
-                  <Avatar url={selectedUser.profileImageUrl} size={36} />
+                  <UserAvatar url={selectedUser.profileImageUrl} size={36} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{selectedUser.userNickname}</div>
                     <div style={{ fontSize: 11, color: "var(--admin-ink-3)" }}>ID #{selectedUser.userId}</div>
@@ -413,7 +414,7 @@ const TicketPage: React.FC = () => {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                  <Avatar url={p.profileImageUrl} size={28} />
+                  <UserAvatar url={p.profileImageUrl} size={28} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 600 }}>{p.nickname ?? "-"}</div>
                     {p.userName && <div style={{ fontSize: 11, color: "var(--admin-ink-3)" }}>{p.userName}</div>}
@@ -471,25 +472,6 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
   <div style={{ marginBottom: 16 }}>
     <div style={{ fontSize: 12, fontWeight: 600, color: "var(--admin-ink-2)", marginBottom: 8 }}>{label}</div>
     {children}
-  </div>
-);
-
-const Avatar: React.FC<{ url: string | null; size: number }> = ({ url, size }) => (
-  <div
-    style={{
-      width: size,
-      height: size,
-      borderRadius: "50%",
-      background: url ? "transparent" : "#e8e8ee",
-      overflow: "hidden",
-      display: "grid",
-      placeItems: "center",
-      fontSize: 12,
-      color: "var(--admin-ink-2)",
-      flexShrink: 0,
-    }}
-  >
-    {url ? <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "?"}
   </div>
 );
 

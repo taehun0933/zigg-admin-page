@@ -514,34 +514,12 @@ const TicketPage: React.FC = () => {
 
           {/* pagination */}
           {totalPages > 1 && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                gap: 12,
-                padding: "14px 22px",
-                borderTop: "1px solid var(--admin-border)",
-              }}
-            >
-              <button
-                onClick={() => loadPurchases(page - 1, purchaseQuery)}
-                disabled={page <= 0 || loadingPurchases}
-                style={{ ...btnSecondary, height: 34, opacity: page <= 0 ? 0.4 : 1 }}
-              >
-                이전
-              </button>
-              <span style={{ fontSize: 12.5, color: "var(--admin-ink-2)", fontVariantNumeric: "tabular-nums" }}>
-                {page + 1} / {totalPages}
-              </span>
-              <button
-                onClick={() => loadPurchases(page + 1, purchaseQuery)}
-                disabled={page >= totalPages - 1 || loadingPurchases}
-                style={{ ...btnSecondary, height: 34, opacity: page >= totalPages - 1 ? 0.4 : 1 }}
-              >
-                다음
-              </button>
-            </div>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              loading={loadingPurchases}
+              onGo={(p) => loadPurchases(p, purchaseQuery)}
+            />
           )}
         </div>
         )}

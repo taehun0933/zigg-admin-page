@@ -307,6 +307,9 @@ const ApplicantDetailModal: React.FC<Props> = ({
         }
       `}</style>
       <div
+        // 지원자가 바뀌면 카드 전체를 리마운트 — <img>/<video> DOM 재사용으로
+        // 새 사진이 로드될 때까지 이전 지원자의 사진·영상이 남아 보이던 문제 방지
+        key={a.id}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
@@ -1155,19 +1158,9 @@ const ApplicantDetailModal: React.FC<Props> = ({
             cursor: "zoom-out",
           }}
         >
-          <img
-            src={cdnImage(images[viewerIdx].imageKey, { width: 1600 })}
-            onError={cdnImgError(images[viewerIdx].imageKey)}
+          <ViewerImage
+            imageKey={images[viewerIdx].imageKey}
             alt={`${a.name} 사진 ${viewerIdx + 1}`}
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              maxWidth: "92vw",
-              maxHeight: "88vh",
-              objectFit: "contain",
-              borderRadius: 12,
-              boxShadow: "0 24px 64px rgba(0,0,0,.5)",
-              cursor: "default",
-            }}
           />
           <span
             style={{
@@ -1233,6 +1226,42 @@ const ApplicantDetailModal: React.FC<Props> = ({
         </div>
       )}
     </div>
+  );
+};
+
+// 확대 뷰어 이미지 — 그리드에서 이미 캐시된 w500 을 즉시 보여주고,
+// 고해상도(w1600)는 백그라운드 로드가 끝나면 교체한다. (리사이즈 CDN 첫 변환이
+// 수 초 걸려 빈 화면으로 보이던 문제 방지)
+const ViewerImage: React.FC<{ imageKey: string; alt: string }> = ({ imageKey, alt }) => {
+  const [hiLoaded, setHiLoaded] = useState(false);
+  const lowSrc = cdnImage(imageKey, { width: 500 });
+  const hiSrc = cdnImage(imageKey, { width: 1600 });
+
+  useEffect(() => {
+    setHiLoaded(false);
+    const im = new window.Image();
+    im.src = hiSrc;
+    im.onload = () => setHiLoaded(true);
+    return () => {
+      im.onload = null;
+    };
+  }, [hiSrc]);
+
+  return (
+    <img
+      src={hiLoaded ? hiSrc : lowSrc}
+      onError={cdnImgError(imageKey)}
+      alt={alt}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        maxWidth: "92vw",
+        maxHeight: "88vh",
+        objectFit: "contain",
+        borderRadius: 12,
+        boxShadow: "0 24px 64px rgba(0,0,0,.5)",
+        cursor: "default",
+      }}
+    />
   );
 };
 

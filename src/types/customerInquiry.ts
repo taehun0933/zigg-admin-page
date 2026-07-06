@@ -15,6 +15,12 @@ export interface CustomerInquiryImageType {
   imageKey: string;
 }
 
+/** 문의 첨부 영상 — videoUrl 에 CDN 전체 URL */
+export interface CustomerInquiryVideoType {
+  videoUrl: string;
+  videoDuration: string;
+}
+
 /** 문의 상세 (content 한 건) */
 export interface CustomerInquiryDetailType {
   id: number;
@@ -22,6 +28,8 @@ export interface CustomerInquiryDetailType {
   title: string;
   message: string;
   images?: CustomerInquiryImageType[];
+  video?: CustomerInquiryVideoType | null;
+  videoThumbnail?: CustomerInquiryImageType | null;
   replies: CustomerInquiryReplyType[];
   createdAt: string;
 }

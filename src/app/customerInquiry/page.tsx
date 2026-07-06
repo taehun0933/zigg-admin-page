@@ -295,6 +295,20 @@ const CustomerInquiryPage: React.FC = () => {
                 <span>{formatYmdHm(selected.createdAt)}</span>
               </div>
               <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.55, margin: 0 }}>{selected.message}</p>
+              {selected.video && (
+                <video
+                  controls
+                  src={selected.video.videoUrl}
+                  poster={selected.videoThumbnail?.imageKey}
+                  style={{
+                    width: "100%",
+                    maxHeight: 320,
+                    marginTop: 12,
+                    borderRadius: 8,
+                    background: "#000",
+                  }}
+                />
+              )}
               {selected.images && selected.images.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
                   {selected.images.map((img, i) => (

@@ -470,7 +470,9 @@ const ApplicantDetailModal: React.FC<Props> = ({
               >
                 {photo ? (
                   <img
-                    src={cdnImage(photo, { width: 480 })}
+                    // 목록 카드와 같은 w400 을 재사용 — 다른 폭을 쓰면 리사이즈 CDN
+                    // 캐시 미스로 모달 열 때마다 변환(1~2초)이 새로 돈다
+                    src={cdnImage(photo, { width: 400 })}
                     onError={cdnImgError(photo)}
                     alt={a.name}
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
@@ -1230,12 +1232,12 @@ const ApplicantDetailModal: React.FC<Props> = ({
 };
 
 // 확대 뷰어 이미지 — 그리드에서 이미 캐시된 w500 을 즉시 보여주고,
-// 고해상도(w1600)는 백그라운드 로드가 끝나면 교체한다. (리사이즈 CDN 첫 변환이
-// 수 초 걸려 빈 화면으로 보이던 문제 방지)
+// 원본(콘텐츠 CloudFront)이 로드되면 교체한다. 리사이즈 CDN 을 거치면
+// 첫 변환에 수 초 걸리므로 확대는 변환 없이 원본을 그대로 쓴다.
 const ViewerImage: React.FC<{ imageKey: string; alt: string }> = ({ imageKey, alt }) => {
   const [hiLoaded, setHiLoaded] = useState(false);
   const lowSrc = cdnImage(imageKey, { width: 500 });
-  const hiSrc = cdnImage(imageKey, { width: 1600 });
+  const hiSrc = imageKey; // 원본 URL
 
   useEffect(() => {
     setHiLoaded(false);

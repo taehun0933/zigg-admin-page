@@ -141,7 +141,14 @@ const ApplicantDetailModal: React.FC<Props> = ({
   useEffect(() => {
     if (!applicant) return;
     const onKey = (e: KeyboardEvent) => {
+      // 피드백 textarea 등에서 커서 이동(←/→) 중 지원자가 넘어가며
+      // 작성 중이던 내용이 날아가는 사고 방지
+      const t = e.target as HTMLElement | null;
+      const typing =
+        t &&
+        (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable);
       if (e.key === "Escape") onClose();
+      if (typing) return;
       if (e.key === "ArrowRight" && onNext) onNext();
       if (e.key === "ArrowLeft" && onPrev) onPrev();
     };
@@ -160,7 +167,8 @@ const ApplicantDetailModal: React.FC<Props> = ({
     .slice(0, 2);
   const type = a.desiredPosition || "";
   const tone = TYPE_TONE[type] ?? defaultTone;
-  const photo = a.images?.[0]?.imageKey;
+  const images = a.images ?? [];
+  const photo = images[0]?.imageKey;
   const videos = a.videos ?? [];
 
   const canSend = feedbackText.trim().length > 0 && !isSending;
@@ -655,11 +663,11 @@ const ApplicantDetailModal: React.FC<Props> = ({
             title="사진"
             action={
               <span style={{ fontSize: 12, color: "var(--admin-ink-3)" }}>
-                {a.images.length}장
+                {images.length}장
               </span>
             }
           >
-            {a.images.length === 0 ? (
+            {images.length === 0 ? (
               <div
                 style={{
                   padding: "36px 0",
@@ -678,7 +686,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
                   gap: 10,
                 }}
               >
-                {a.images.map((img, i) => (
+                {images.map((img, i) => (
                   <div
                     key={i}
                     style={{

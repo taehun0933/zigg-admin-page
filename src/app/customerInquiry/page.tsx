@@ -14,6 +14,7 @@ import {
   CustomerInquiryReplyType,
 } from "@/types/customerInquiry";
 import { formatYmdHm } from "@/utils/common";
+import { cdnImage, cdnImgError } from "@/utils/cdnImage";
 import { Pagination } from "@mui/material";
 
 const PAGE_SIZE = 20;
@@ -160,7 +161,7 @@ const CustomerInquiryPage: React.FC = () => {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "70px 120px 1fr 80px 160px 80px",
+              gridTemplateColumns: "70px 120px 56px 1fr 80px 160px 80px",
               padding: "12px 22px",
               borderBottom: "1px solid var(--admin-border)",
               fontSize: 11,
@@ -172,6 +173,7 @@ const CustomerInquiryPage: React.FC = () => {
           >
             <span>#</span>
             <span>닉네임</span>
+            <span>첨부</span>
             <span>제목</span>
             <span style={{ textAlign: "center" }}>답장수</span>
             <span>작성일</span>
@@ -204,7 +206,7 @@ const CustomerInquiryPage: React.FC = () => {
                 }}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "70px 120px 1fr 80px 160px 80px",
+                  gridTemplateColumns: "70px 120px 56px 1fr 80px 160px 80px",
                   padding: "14px 22px",
                   borderTop: i ? "1px solid var(--admin-border)" : "none",
                   alignItems: "center",
@@ -220,6 +222,7 @@ const CustomerInquiryPage: React.FC = () => {
                   #{v.id}
                 </span>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{v.user.userNickname}</span>
+                <InquiryThumb inquiry={v} />
                 <span
                   style={{
                     fontSize: 14,
@@ -299,29 +302,32 @@ const CustomerInquiryPage: React.FC = () => {
                 <video
                   controls
                   src={selected.video.videoUrl}
-                  poster={selected.videoThumbnail?.imageKey}
+                  poster={cdnImage(selected.videoThumbnail?.imageKey, { width: 800 })}
                   style={{
                     width: "100%",
-                    maxHeight: 320,
+                    maxHeight: 420,
                     marginTop: 12,
-                    borderRadius: 8,
+                    borderRadius: 10,
                     background: "#000",
                   }}
                 />
               )}
               {selected.images && selected.images.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
                   {selected.images.map((img, i) => (
                     <a key={i} href={img.imageKey} target="_blank" rel="noreferrer">
+                      {/* 오디션 지원자 카드와 동일 스펙 (aspectRatio 1/1.05, 리사이즈 CDN width 400) */}
                       <img
-                        src={img.imageKey}
+                        src={cdnImage(img.imageKey, { width: 400 })}
+                        onError={cdnImgError(img.imageKey)}
                         alt={`첨부 이미지 ${i + 1}`}
                         style={{
-                          width: 96,
-                          height: 96,
+                          width: 190,
+                          aspectRatio: "1 / 1.05",
                           objectFit: "cover",
-                          borderRadius: 8,
+                          borderRadius: 10,
                           border: "1px solid var(--admin-border)",
+                          background: "#f3f3f6",
                           display: "block",
                         }}
                       />
@@ -392,6 +398,59 @@ const CustomerInquiryPage: React.FC = () => {
         )}
       </Modal>
     </AdminShell>
+  );
+};
+
+/** 목록용 첨부 썸네일 — 영상 우선(썸네일+▶), 없으면 첫 이미지. 리사이즈 CDN 적용 */
+const InquiryThumb: React.FC<{ inquiry: CustomerInquiryDetailType }> = ({ inquiry }) => {
+  const hasVideo = !!inquiry.video;
+  const thumbKey = hasVideo
+    ? inquiry.videoThumbnail?.imageKey
+    : inquiry.images?.[0]?.imageKey;
+
+  if (!hasVideo && !thumbKey) {
+    return <span style={{ fontSize: 12, color: "var(--admin-ink-3)" }}>—</span>;
+  }
+
+  return (
+    <span
+      style={{
+        position: "relative",
+        width: 44,
+        height: 44,
+        borderRadius: 8,
+        overflow: "hidden",
+        background: "#1c1c22",
+        border: "1px solid var(--admin-border)",
+        display: "grid",
+        placeItems: "center",
+        flexShrink: 0,
+      }}
+    >
+      {thumbKey && (
+        <img
+          src={cdnImage(thumbKey, { width: 96 })}
+          onError={cdnImgError(thumbKey)}
+          alt=""
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+      )}
+      {hasVideo && (
+        <span
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "grid",
+            placeItems: "center",
+            color: "#fff",
+            fontSize: 14,
+            textShadow: "0 1px 3px rgba(0,0,0,.6)",
+          }}
+        >
+          ▶
+        </span>
+      )}
+    </span>
   );
 };
 

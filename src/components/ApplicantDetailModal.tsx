@@ -66,6 +66,8 @@ const ApplicantDetailModal: React.FC<Props> = ({
   const [history, setHistory] = useState<AuditionFeedback[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // 사진 확대 뷰어 — 열려 있으면 해당 사진 인덱스, 닫혀 있으면 null
+  const [viewerIdx, setViewerIdx] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -106,6 +108,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
     setEditingId(null);
     setEditingText("");
     setHistory([]);
+    setViewerIdx(null);
     refreshFeedbacks();
     refreshHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,6 +150,16 @@ const ApplicantDetailModal: React.FC<Props> = ({
       const typing =
         t &&
         (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable);
+      // 사진 확대 뷰어가 열려 있으면 키는 뷰어 조작(닫기/사진 이동)에만 사용
+      if (viewerIdx !== null) {
+        const count = applicant.images?.length ?? 0;
+        if (e.key === "Escape") setViewerIdx(null);
+        if (e.key === "ArrowRight")
+          setViewerIdx((i) => (i === null ? null : Math.min(count - 1, i + 1)));
+        if (e.key === "ArrowLeft")
+          setViewerIdx((i) => (i === null ? null : Math.max(0, i - 1)));
+        return;
+      }
       if (e.key === "Escape") onClose();
       if (typing) return;
       if (e.key === "ArrowRight" && onNext) onNext();
@@ -154,7 +167,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [applicant, onClose, onNext, onPrev]);
+  }, [applicant, onClose, onNext, onPrev, viewerIdx]);
 
   if (!applicant) return null;
   const a = applicant;
@@ -436,6 +449,8 @@ const ApplicantDetailModal: React.FC<Props> = ({
             >
               <div
                 className="ad-profile-photo"
+                onClick={() => photo && setViewerIdx(0)}
+                title={photo ? "클릭해서 크게 보기" : undefined}
                 style={{
                   width: 140,
                   aspectRatio: "1 / 1.1",
@@ -447,6 +462,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
                   display: "flex",
                   alignItems: "flex-end",
                   justifyContent: "center",
+                  cursor: photo ? "zoom-in" : "default",
                 }}
               >
                 {photo ? (
@@ -689,12 +705,15 @@ const ApplicantDetailModal: React.FC<Props> = ({
                 {images.map((img, i) => (
                   <div
                     key={i}
+                    onClick={() => setViewerIdx(i)}
+                    title="클릭해서 크게 보기"
                     style={{
                       aspectRatio: "1 / 1.2",
                       borderRadius: 12,
                       overflow: "hidden",
                       background: "#f3f3f6",
                       position: "relative",
+                      cursor: "zoom-in",
                     }}
                   >
                     <img
@@ -1115,8 +1134,122 @@ const ApplicantDetailModal: React.FC<Props> = ({
           )}
         </div>
       </div>
+
+      {/* 사진 확대 뷰어 */}
+      {viewerIdx !== null && images[viewerIdx] && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            setViewerIdx(null);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 200,
+            background: "rgba(10, 12, 18, 0.88)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 32,
+            animation: "detailFadeIn .12s ease",
+            cursor: "zoom-out",
+          }}
+        >
+          <img
+            src={cdnImage(images[viewerIdx].imageKey, { width: 1600 })}
+            onError={cdnImgError(images[viewerIdx].imageKey)}
+            alt={`${a.name} 사진 ${viewerIdx + 1}`}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "92vw",
+              maxHeight: "88vh",
+              objectFit: "contain",
+              borderRadius: 12,
+              boxShadow: "0 24px 64px rgba(0,0,0,.5)",
+              cursor: "default",
+            }}
+          />
+          <span
+            style={{
+              position: "absolute",
+              top: 22,
+              left: 24,
+              fontSize: 12,
+              fontWeight: 700,
+              color: "rgba(255,255,255,.85)",
+              letterSpacing: 0.4,
+            }}
+          >
+            PHOTO {String(viewerIdx + 1).padStart(2, "0")} /{" "}
+            {String(images.length).padStart(2, "0")}
+          </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setViewerIdx(null);
+            }}
+            title="닫기 (Esc)"
+            style={{
+              position: "absolute",
+              top: 14,
+              right: 16,
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              background: "rgba(255,255,255,.12)",
+              color: "#fff",
+              fontSize: 20,
+              display: "grid",
+              placeItems: "center",
+              cursor: "pointer",
+            }}
+          >
+            ×
+          </button>
+          {viewerIdx > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setViewerIdx(viewerIdx - 1);
+              }}
+              title="이전 사진 (←)"
+              style={{ ...viewerNavBtn, left: 18 }}
+            >
+              ←
+            </button>
+          )}
+          {viewerIdx < images.length - 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setViewerIdx(viewerIdx + 1);
+              }}
+              title="다음 사진 (→)"
+              style={{ ...viewerNavBtn, right: 18 }}
+            >
+              →
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
+};
+
+const viewerNavBtn: React.CSSProperties = {
+  position: "absolute",
+  top: "50%",
+  transform: "translateY(-50%)",
+  width: 44,
+  height: 44,
+  borderRadius: 12,
+  background: "rgba(255,255,255,.12)",
+  color: "#fff",
+  fontSize: 18,
+  fontWeight: 600,
+  display: "grid",
+  placeItems: "center",
+  cursor: "pointer",
 };
 
 const cardActionBtn: React.CSSProperties = {

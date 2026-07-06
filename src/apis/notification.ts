@@ -5,6 +5,8 @@ export interface AdminBroadcastNotificationRequest {
   title: string;
   body: string;
   data?: Record<string, string>;
+  /** 첨부 이미지 contentId 목록 (최대 5장) — 백엔드가 CDN URL 로 변환해 data.imageUrls 로 발송 */
+  imageIds?: number[];
 }
 
 /** 전체 유저 대상 알림(FCM push + 인앱 기록) 발송 */

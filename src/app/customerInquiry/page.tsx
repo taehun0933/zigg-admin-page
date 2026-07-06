@@ -295,6 +295,26 @@ const CustomerInquiryPage: React.FC = () => {
                 <span>{formatYmdHm(selected.createdAt)}</span>
               </div>
               <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.55, margin: 0 }}>{selected.message}</p>
+              {selected.images && selected.images.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+                  {selected.images.map((img, i) => (
+                    <a key={i} href={img.imageKey} target="_blank" rel="noreferrer">
+                      <img
+                        src={img.imageKey}
+                        alt={`첨부 이미지 ${i + 1}`}
+                        style={{
+                          width: 96,
+                          height: 96,
+                          objectFit: "cover",
+                          borderRadius: 8,
+                          border: "1px solid var(--admin-border)",
+                          display: "block",
+                        }}
+                      />
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div

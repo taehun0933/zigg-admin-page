@@ -9,8 +9,11 @@ import {
   broadcastInquiryPromptNotification,
   sendAuditionNotification,
 } from "@/apis/notification";
+import { requestImagePresignedUrl, putFileToPresignedUrl } from "@/apis/media";
 import { getAuditions } from "@/apis/audition";
 import { getApiMode } from "@/utils/apiConfig";
+
+const MAX_IMAGES = 5;
 
 type Mode = "general" | "audition" | "inquiry_prompt";
 
@@ -34,6 +37,8 @@ const NotificationPage: React.FC = () => {
 
   const [generalTitle, setGeneralTitle] = useState("");
   const [generalBody, setGeneralBody] = useState("");
+  // 일반 알림 첨부 이미지 (최대 5장) — 발송 시 presigned 업로드 후 imageIds 로 전송
+  const [generalImages, setGeneralImages] = useState<File[]>([]);
 
   const [auditions, setAuditions] = useState<AuditionOption[]>([]);
   const [auditionsLoading, setAuditionsLoading] = useState(false);
@@ -103,9 +108,20 @@ const NotificationPage: React.FC = () => {
     setError(null);
     try {
       if (mode === "general") {
-        await broadcastNotification({ title: generalTitle.trim(), body: generalBody.trim() });
+        const imageIds: number[] = [];
+        for (const img of generalImages) {
+          const { url, contentId } = await requestImagePresignedUrl(img, "NOTIFICATION_IMAGE");
+          await putFileToPresignedUrl(url, img);
+          imageIds.push(contentId);
+        }
+        await broadcastNotification({
+          title: generalTitle.trim(),
+          body: generalBody.trim(),
+          imageIds,
+        });
         setGeneralTitle("");
         setGeneralBody("");
+        setGeneralImages([]);
       } else if (mode === "audition" && selectedAuditionId !== null) {
         await sendAuditionNotification(selectedAuditionId, {
           title: auditionTitle.trim(),
@@ -240,6 +256,77 @@ const NotificationPage: React.FC = () => {
                 {currentBody.length}/300
               </div>
             </Field>
+
+            {mode === "general" && (
+              <Field label={`이미지 첨부 (선택, 최대 ${MAX_IMAGES}장)`}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => {
+                    const picked = Array.from(e.target.files ?? []);
+                    if (picked.length === 0) return;
+                    setGeneralImages((prev) => {
+                      const combined = [...prev, ...picked];
+                      if (combined.length > MAX_IMAGES) {
+                        alert(`이미지는 최대 ${MAX_IMAGES}장까지 첨부할 수 있습니다.`);
+                      }
+                      return combined.slice(0, MAX_IMAGES);
+                    });
+                    e.target.value = "";
+                  }}
+                  style={{ fontSize: 13 }}
+                />
+                {generalImages.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+                    {generalImages.map((file, i) => (
+                      <div key={i} style={{ position: "relative" }}>
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt={file.name}
+                          style={{
+                            width: 84,
+                            height: 84,
+                            objectFit: "cover",
+                            borderRadius: 8,
+                            border: "1px solid var(--admin-border)",
+                            display: "block",
+                          }}
+                        />
+                        <button
+                          onClick={() =>
+                            setGeneralImages((prev) => prev.filter((_, idx) => idx !== i))
+                          }
+                          style={{
+                            position: "absolute",
+                            top: -6,
+                            right: -6,
+                            width: 20,
+                            height: 20,
+                            borderRadius: 10,
+                            background: "rgba(0,0,0,.65)",
+                            color: "#fff",
+                            fontSize: 11,
+                            lineHeight: "20px",
+                            textAlign: "center",
+                            cursor: "pointer",
+                          }}
+                          aria-label="이미지 제거"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <span style={{ fontSize: 12, color: "var(--admin-ink-3)", alignSelf: "flex-end" }}>
+                      {generalImages.length}/{MAX_IMAGES}
+                    </span>
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: "var(--admin-ink-3)", marginTop: 6 }}>
+                  이미지는 푸시 배너에는 표시되지 않고, 앱 알림함에서 알림을 눌렀을 때 상세 모달에 표시됩니다.
+                </div>
+              </Field>
+            )}
 
             {error && (
               <div
@@ -515,6 +602,14 @@ const NotificationPage: React.FC = () => {
               <div style={{ fontWeight: 600, marginBottom: 8 }}>{currentTitle}</div>
               <div style={{ fontSize: 11, color: "var(--admin-ink-3)", marginBottom: 2 }}>본문</div>
               <div style={{ whiteSpace: "pre-wrap" }}>{currentBody}</div>
+              {mode === "general" && generalImages.length > 0 && (
+                <>
+                  <div style={{ fontSize: 11, color: "var(--admin-ink-3)", margin: "8px 0 2px" }}>
+                    첨부 이미지
+                  </div>
+                  <div>{generalImages.length}장</div>
+                </>
+              )}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button

@@ -23,7 +23,9 @@ export type ImageUploadPurposeType =
   | "AUDITION_VIDEO"
   | "NOTICE_BANNER"
   | "NOTICE_IMAGE"
-  | "NOTICE_VIDEO";
+  | "NOTICE_VIDEO"
+  | "NOTIFICATION_IMAGE"
+  | "INQUIRY_IMAGE";
 
 interface UploadUrlResponse {
   contentId: number;

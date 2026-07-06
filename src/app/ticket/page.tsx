@@ -528,6 +528,42 @@ const TicketPage: React.FC = () => {
   );
 };
 
+const Pagination: React.FC<{
+  page: number;
+  totalPages: number;
+  loading: boolean;
+  onGo: (page: number) => void;
+}> = ({ page, totalPages, loading, onGo }) => (
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 12,
+      padding: "14px 22px",
+      borderTop: "1px solid var(--admin-border)",
+    }}
+  >
+    <button
+      onClick={() => onGo(page - 1)}
+      disabled={page <= 0 || loading}
+      style={{ ...btnSecondary, height: 34, opacity: page <= 0 ? 0.4 : 1 }}
+    >
+      이전
+    </button>
+    <span style={{ fontSize: 12.5, color: "var(--admin-ink-2)", fontVariantNumeric: "tabular-nums" }}>
+      {page + 1} / {totalPages}
+    </span>
+    <button
+      onClick={() => onGo(page + 1)}
+      disabled={page >= totalPages - 1 || loading}
+      style={{ ...btnSecondary, height: 34, opacity: page >= totalPages - 1 ? 0.4 : 1 }}
+    >
+      다음
+    </button>
+  </div>
+);
+
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div style={{ marginBottom: 16 }}>
     <div style={{ fontSize: 12, fontWeight: 600, color: "var(--admin-ink-2)", marginBottom: 8 }}>{label}</div>

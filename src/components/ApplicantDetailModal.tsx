@@ -161,7 +161,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
   const type = a.desiredPosition || "";
   const tone = TYPE_TONE[type] ?? defaultTone;
   const photo = a.images?.[0]?.imageKey;
-  const video = a.videos?.[0];
+  const videos = a.videos ?? [];
 
   const canSend = feedbackText.trim().length > 0 && !isSending;
 
@@ -578,38 +578,61 @@ const ApplicantDetailModal: React.FC<Props> = ({
               </Section>
 
               <Section
-                title="자기 소개 영상"
+                title="지원 영상"
                 action={
-                  video?.videoDuration ? (
+                  videos.length > 0 ? (
                     <span style={{ fontSize: 12, color: "var(--admin-ink-3)" }}>
-                      {formatDuration(video.videoDuration)}
+                      {videos.length}개
                     </span>
                   ) : null
                 }
               >
-                {video ? (
-                  <div
-                    style={{
-                      width: "100%",
-                      aspectRatio: "16 / 10",
-                      borderRadius: 12,
-                      overflow: "hidden",
-                      background: "#1a1a1f",
-                    }}
-                  >
-                    <video
-                      key={video.videoUrl}
-                      src={video.videoUrl}
-                      controls
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "contain",
-                        background: "#000",
-                      }}
-                    >
-                      동영상을 지원하지 않는 브라우저입니다.
-                    </video>
+                {videos.length > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {videos.map((video, i) => (
+                      <div key={video.videoUrl ?? i} style={{ position: "relative" }}>
+                        <div
+                          style={{
+                            width: "100%",
+                            aspectRatio: "16 / 10",
+                            borderRadius: 12,
+                            overflow: "hidden",
+                            background: "#1a1a1f",
+                          }}
+                        >
+                          <video
+                            src={video.videoUrl}
+                            controls
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "contain",
+                              background: "#000",
+                            }}
+                          >
+                            동영상을 지원하지 않는 브라우저입니다.
+                          </video>
+                        </div>
+                        <span
+                          style={{
+                            position: "absolute",
+                            top: 8,
+                            left: 10,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "rgba(255,255,255,.92)",
+                            letterSpacing: 0.3,
+                            textShadow: "0 1px 2px rgba(0,0,0,.45)",
+                            pointerEvents: "none",
+                          }}
+                        >
+                          VIDEO {(i + 1).toString().padStart(2, "0")}
+                          {video.videoDuration
+                            ? ` · ${formatDuration(video.videoDuration)}`
+                            : ""}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <div

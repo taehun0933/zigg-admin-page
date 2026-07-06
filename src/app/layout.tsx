@@ -5,19 +5,37 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "ZIGG Admin",
   description: "ZIGG X Godition 관리자 페이지",
-  other: { google: "notranslate" },
 };
+
+// 브라우저 자동번역(구글 번역)이 텍스트 노드를 <font>로 감싸면 React가
+// 원래 노드를 removeChild/insertBefore 하다 NotFoundError로 크래시함.
+// 번역은 허용하되 크래시만 무해하게 흡수 (facebook/react#11538 공식 워크어라운드)
+const domPatchScript = `
+if (typeof Node === 'function' && Node.prototype) {
+  var origRemoveChild = Node.prototype.removeChild;
+  Node.prototype.removeChild = function(child) {
+    if (child.parentNode !== this) { return child; }
+    return origRemoveChild.apply(this, arguments);
+  };
+  var origInsertBefore = Node.prototype.insertBefore;
+  Node.prototype.insertBefore = function(newNode, referenceNode) {
+    if (referenceNode && referenceNode.parentNode !== this) {
+      return origInsertBefore.call(this, newNode, null);
+    }
+    return origInsertBefore.apply(this, arguments);
+  };
+}
+`;
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // 브라우저 자동번역이 텍스트 노드를 <font>로 감싸 React removeChild 크래시를
-  // 일으킴 — lang="ko"만으론 번역기 강제 실행을 못 막아 translate="no"로 차단
   return (
-    <html lang="ko" translate="no">
+    <html lang="ko">
       <body className="antialiased" suppressHydrationWarning>
+        <script dangerouslySetInnerHTML={{ __html: domPatchScript }} />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

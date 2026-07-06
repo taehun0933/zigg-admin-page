@@ -5,6 +5,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "ZIGG Admin",
   description: "ZIGG X Godition 관리자 페이지",
+  other: { google: "notranslate" },
 };
 
 export default function RootLayout({
@@ -12,10 +13,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // 컨텐츠는 한국어인데 lang="en"이면 브라우저 자동번역이 개입해
-  // React DOM 조작과 충돌(removeChild 크래시)할 수 있어 ko로 명시
+  // 브라우저 자동번역이 텍스트 노드를 <font>로 감싸 React removeChild 크래시를
+  // 일으킴 — lang="ko"만으론 번역기 강제 실행을 못 막아 translate="no"로 차단
   return (
-    <html lang="ko">
+    <html lang="ko" translate="no">
       <body className="antialiased" suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
       </body>

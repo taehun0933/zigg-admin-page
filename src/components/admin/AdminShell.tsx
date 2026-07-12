@@ -21,6 +21,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { id: "dashboard", label: "대시보드", icon: "home", activeIcon: "home_activated", path: "/dashboard" },
   { id: "auditions", label: "오디션 관리", icon: "star", path: "/audition" },
+  { id: "challenges", label: "챌린지 관리", icon: "award", path: "/challenge" },
   { id: "boards", label: "게시판 관리", icon: "community", activeIcon: "community_activated", path: "/board" },
   { id: "notices", label: "공지사항", icon: "speaker", activeIcon: "speaker_activated", path: "/notice" },
   { id: "notify", label: "알림 발송", icon: "bell", path: "/notification" },

@@ -42,6 +42,15 @@ export interface AuditionDetailType {
   likeCount: number;
   scrapCount: number;
   applicationCount: number;
+  /** 피드백 마무리(일괄 공개) 시각 — null 이면 마무리 전 */
+  feedbackFinalizedAt?: string | null;
+}
+
+/** 피드백에 저장된 항목별 점수 (name 은 채점 당시 항목명 스냅샷) */
+export interface FeedbackItemScore {
+  feedbackItemId: number;
+  name: string;
+  score: number; // 1..5
 }
 
 export interface AuditionFeedback {
@@ -51,6 +60,9 @@ export interface AuditionFeedback {
   application: AuditionProfileType;
   auditionTitle?: string | null;
   createdAt: string; // ISO string
+  itemScores?: FeedbackItemScore[];
+  /** 지원자에게 공개된 시각 — null 이면 마무리 전 초안 */
+  publishedAt?: string | null;
 }
 
 export type AuditionFeedbackList = AuditionFeedback[];

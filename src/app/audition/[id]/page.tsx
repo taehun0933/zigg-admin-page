@@ -10,6 +10,7 @@ import { adminCardStyle, btnPrimary, btnSecondary } from "@/components/admin/Pag
 import ApplicantDetailModal from "@/components/ApplicantDetailModal";
 import {
   AuditionFilterType,
+  getAuditionDetail,
   getAuditionInfo,
   getAuditions,
   scrapApplicant,
@@ -18,6 +19,7 @@ import {
   deleteLikeApplicant,
 } from "@/apis/audition";
 import { AuditionProfileType } from "@/types/audition";
+import { finalizeAuditionFeedbacks } from "@/apis/feedback";
 import { countryNameKo } from "@/utils/countryName";
 import { cdnImage, cdnImgError } from "@/utils/cdnImage";
 import { Audition } from "@/app/audition/page";
@@ -81,6 +83,14 @@ const AuditionDetailPage: React.FC = () => {
 
   const [selected, setSelected] = useState<AuditionProfileType | null>(null);
 
+  // 피드백 마무리하기(일괄 공개) — 서버 값은 오디션 상세에서 조회, 성공 후엔 로컬로 즉시 반영
+  const [finalizing, setFinalizing] = useState(false);
+  const [localFinalizedAt, setLocalFinalizedAt] = useState<string | null>(null);
+  // undefined = 아직 모름(버튼 비활성), null = 마무리 전, string = 마무리 시각
+  const [serverFinalizedAt, setServerFinalizedAt] = useState<
+    string | null | undefined
+  >(undefined);
+
   // 북마크 클릭 시 스크롤할 대상(아직 로드 안 됐을 수 있어 effect로 처리)
   const [scrollTarget, setScrollTarget] = useState<number | null>(null);
 
@@ -109,6 +119,56 @@ const AuditionDetailPage: React.FC = () => {
     [auditions],
   );
   const currentAudition = auditionsWithColor.find((a) => a.id === id);
+
+  // 오디션이 바뀌면 마무리 상태를 서버(오디션 상세)에서 다시 조회
+  useEffect(() => {
+    if (!ready || !id) return;
+    setLocalFinalizedAt(null);
+    setServerFinalizedAt(undefined);
+    let cancelled = false;
+    getAuditionDetail(id)
+      .then((detail) => {
+        if (!cancelled) setServerFinalizedAt(detail.feedbackFinalizedAt ?? null);
+      })
+      .catch(() => {
+        // 상세 조회 실패 시 칩 목록 값으로라도 동작하게 null 처리하지 않고 아래 fallback 에 맡김
+        if (!cancelled) setServerFinalizedAt(undefined);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, id]);
+
+  const feedbackFinalizedAt =
+    localFinalizedAt ??
+    (serverFinalizedAt !== undefined
+      ? serverFinalizedAt
+      : currentAudition?.feedbackFinalizedAt ?? null);
+  // 상세도 칩 목록도 아직 없으면 상태 미확정 → 마무리 버튼 잠금
+  const finalizeStateKnown =
+    localFinalizedAt !== null ||
+    serverFinalizedAt !== undefined ||
+    currentAudition !== undefined;
+
+  const handleFinalizeFeedbacks = async () => {
+    if (finalizing) return;
+    const ok = window.confirm(
+      "오디션 피드백을 마무리하시겠습니까?\n대기 중인 피드백이 모든 지원자에게 공개되고 푸시 알림이 발송됩니다.\n마무리 이후 보내는 피드백은 즉시 전송됩니다.",
+    );
+    if (!ok) return;
+    setFinalizing(true);
+    try {
+      const result = await finalizeAuditionFeedbacks(id);
+      setLocalFinalizedAt(result.finalizedAt);
+      window.alert(
+        `피드백 마무리 완료\n피드백 ${result.publishedCount}건이 공개되고 지원자 ${result.notifiedUserCount}명에게 알림이 발송됐어요.`,
+      );
+    } catch (e: any) {
+      window.alert(e?.message ?? "피드백 마무리에 실패했어요. 다시 시도해 주세요.");
+    } finally {
+      setFinalizing(false);
+    }
+  };
 
   const fetchPage = useCallback(
     async (page: number, replace: boolean) => {
@@ -407,7 +467,7 @@ const AuditionDetailPage: React.FC = () => {
                   )}
                 </p>
               </div>
-              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+              <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
                 <button style={btnSecondary} onClick={() => router.push("/audition")}>
                   ← 목록
                 </button>
@@ -417,6 +477,41 @@ const AuditionDetailPage: React.FC = () => {
                 >
                   <AdminIcon name="edit" size={14} /> 오디션 수정
                 </button>
+                {feedbackFinalizedAt ? (
+                  <button
+                    style={{
+                      ...btnSecondary,
+                      color: "#1f8a52",
+                      background: "var(--admin-good-tint)",
+                      border: "1px solid transparent",
+                      cursor: "default",
+                    }}
+                    title={`마무리 시각: ${feedbackFinalizedAt}`}
+                  >
+                    <AdminIcon name="gradient_check" size={14} /> 피드백 마무리 완료
+                  </button>
+                ) : (
+                  <button
+                    style={{
+                      ...btnPrimary,
+                      background:
+                        finalizing || !finalizeStateKnown
+                          ? "#c8d6f0"
+                          : "var(--admin-blue)",
+                      cursor:
+                        finalizing || !finalizeStateKnown ? "wait" : "pointer",
+                    }}
+                    onClick={handleFinalizeFeedbacks}
+                    disabled={finalizing || !finalizeStateKnown}
+                  >
+                    <AdminIcon name="speaker" size={14} />
+                    {finalizing
+                      ? "마무리 중…"
+                      : !finalizeStateKnown
+                        ? "확인 중…"
+                        : "피드백 마무리하기"}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -697,6 +792,7 @@ const AuditionDetailPage: React.FC = () => {
 
       <ApplicantDetailModal
         applicant={selected}
+        feedbackFinalized={!!feedbackFinalizedAt}
         idx={
           selected ? content.findIndex((c) => c.id === selected.id) + 1 || undefined : undefined
         }

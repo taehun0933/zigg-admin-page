@@ -8,7 +8,12 @@ import {
   updateAuditionFeedback,
   deleteAuditionFeedback,
 } from "@/apis/feedback";
-import { AuditionFeedback, AuditionProfileType } from "@/types/audition";
+import { AuditionFeedback, AuditionProfileType, FeedbackItemScore } from "@/types/audition";
+import {
+  getAdminFeedbackItems,
+  AdminFeedbackItem,
+  FeedbackItemCategory,
+} from "@/apis/asset";
 import { countryNameKo } from "@/utils/countryName";
 import { cdnImage, cdnImgError } from "@/utils/cdnImage";
 import AdminIcon from "@/components/admin/AdminIcon";
@@ -24,6 +29,8 @@ interface Props {
   onToggleLike?: () => void;
   /** 피드백이 추가/삭제되어 "피드백 완료" 여부가 바뀌면 목록 카드 갱신용으로 호출 */
   onFeedbackChange?: (applicantId: number, hasFeedback: boolean) => void;
+  /** 오디션 피드백 마무리(일괄 공개) 여부 — false 면 새 피드백은 초안으로 저장됨 */
+  feedbackFinalized?: boolean;
 }
 
 const TYPE_TONE: Record<string, { tint: string; fg: string }> = {
@@ -35,6 +42,131 @@ const TYPE_TONE: Record<string, { tint: string; fg: string }> = {
   랩: { tint: "#f0ecff", fg: "#6b3ec9" },
 };
 const defaultTone = { tint: "var(--admin-blue-tint)", fg: "var(--admin-blue)" };
+
+/* ---------- 피드백 항목 평가 (1~5) ---------- */
+
+// 전체 항목을 채점해야 전송 가능. 부분 채점 허용으로 바꾸려면 false 로만 변경 (서버는 부분 배열도 수용)
+const REQUIRE_ALL_RATINGS = true;
+const SCORE_LABELS: Record<number, string> = {
+  1: "미흡",
+  2: "보완 필요",
+  3: "보통",
+  4: "우수",
+  5: "탁월",
+};
+
+type FeedbackTab = "text" | "rating";
+
+// desiredPosition(자유 문자열) → 자산관리 피드백 항목 카테고리
+const toFeedbackCategory = (
+  desiredPosition: string | null | undefined
+): FeedbackItemCategory | null => {
+  switch ((desiredPosition ?? "").trim().toLowerCase()) {
+    case "vocal":
+    case "보컬":
+      return "VOCAL";
+    case "rap":
+    case "랩":
+      return "RAP";
+    case "dance":
+    case "댄스":
+      return "DANCE";
+    default:
+      return null;
+  }
+};
+
+// 항목 마스터는 지원자와 무관하므로 모달을 여닫을 때마다 재요청하지 않도록 카테고리별 캐시
+const feedbackItemsCache = new Map<FeedbackItemCategory, AdminFeedbackItem[]>();
+
+const ratingTabBtn = (on: boolean): React.CSSProperties => ({
+  height: 30,
+  padding: "0 12px",
+  borderRadius: 7,
+  fontSize: 12.5,
+  fontWeight: 600,
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  background: on ? "#fff" : "transparent",
+  color: on ? "var(--admin-ink)" : "var(--admin-ink-2)",
+  boxShadow: on ? "0 1px 2px rgba(17,17,26,.08)" : "none",
+  transition: "all .12s",
+  cursor: "pointer",
+});
+
+const ratingTabBadge = (on: boolean): React.CSSProperties => ({
+  fontSize: 10.5,
+  fontWeight: 700,
+  padding: "1px 6px",
+  borderRadius: 999,
+  background: on ? "var(--admin-blue-tint)" : "#e6e6ec",
+  color: on ? "var(--admin-blue)" : "var(--admin-ink-3)",
+  fontVariantNumeric: "tabular-nums",
+});
+
+const ratingEmptyState: React.CSSProperties = {
+  fontSize: 13,
+  color: "var(--admin-ink-3)",
+  padding: "36px 0",
+  textAlign: "center",
+};
+
+// 전송된 피드백 카드의 점수 칩 줄 (점수 없는 구 데이터면 렌더하지 않음)
+const FeedbackScoreChips: React.FC<{
+  scores?: FeedbackItemScore[] | null;
+  toneFg: string;
+}> = ({ scores, toneFg }) => {
+  if (!Array.isArray(scores) || scores.length === 0) return null;
+  const avg = scores.reduce((sum, s) => sum + s.score, 0) / scores.length;
+  return (
+    <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 }}>
+      {scores.map((s) => (
+        <span
+          key={s.feedbackItemId}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+            fontSize: 12,
+            fontWeight: 600,
+            color: "var(--admin-ink-2)",
+            background: "#fafafc",
+            boxShadow: "inset 0 0 0 1px var(--admin-border)",
+            padding: "4px 9px",
+            borderRadius: 8,
+          }}
+        >
+          {s.name}
+          <span
+            style={{
+              fontWeight: 700,
+              color: toneFg,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {s.score}
+          </span>
+        </span>
+      ))}
+      <span
+        style={{
+          display: "flex",
+          alignItems: "center",
+          fontSize: 12,
+          fontWeight: 700,
+          color: "#fff",
+          background: toneFg,
+          padding: "4px 10px",
+          borderRadius: 8,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        평균 {avg.toFixed(1)}
+      </span>
+    </div>
+  );
+};
 
 // 입력값에 이미 단위가 붙어있으면 그대로, 숫자만 있으면 단위 부착.
 const fmtMeasurement = (v: string | number | undefined | null, unit: string): string => {
@@ -53,6 +185,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
   onToggleScrap,
   onToggleLike,
   onFeedbackChange,
+  feedbackFinalized = false,
   idx,
 }) => {
   const [feedbackText, setFeedbackText] = useState("");
@@ -68,6 +201,13 @@ const ApplicantDetailModal: React.FC<Props> = ({
   const [success, setSuccess] = useState<string | null>(null);
   // 사진 확대 뷰어 — 열려 있으면 해당 사진 인덱스, 닫혀 있으면 null
   const [viewerIdx, setViewerIdx] = useState<number | null>(null);
+  // 항목 평가 탭 상태
+  const [feedbackTab, setFeedbackTab] = useState<FeedbackTab>("text");
+  const [ratingItems, setRatingItems] = useState<AdminFeedbackItem[]>([]);
+  const [ratingItemsLoading, setRatingItemsLoading] = useState(false);
+  const [ratingItemsError, setRatingItemsError] = useState<string | null>(null);
+  // feedbackItemId -> 1..5
+  const [ratingScores, setRatingScores] = useState<Record<number, number>>({});
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -111,6 +251,47 @@ const ApplicantDetailModal: React.FC<Props> = ({
     setViewerIdx(null);
     refreshFeedbacks();
     refreshHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicant?.id]);
+
+  // 지원자가 바뀌면 평가 상태 초기화 + 지원 카테고리의 평가 항목 로드 (카테고리별 캐시)
+  useEffect(() => {
+    if (!applicant) return;
+    setFeedbackTab("text");
+    setRatingScores({});
+    setRatingItemsError(null);
+    const category = toFeedbackCategory(applicant.desiredPosition);
+    if (!category) {
+      setRatingItems([]);
+      return;
+    }
+    const cached = feedbackItemsCache.get(category);
+    if (cached) {
+      setRatingItems(cached);
+      return;
+    }
+    // 이전 지원자의 다른 카테고리 항목이 로딩 중에 남지 않도록 비우고,
+    // 빠르게 지원자를 넘길 때 늦게 도착한 응답이 최신 상태를 덮지 않도록 가드
+    setRatingItems([]);
+    setRatingItemsLoading(true);
+    let cancelled = false;
+    getAdminFeedbackItems(category)
+      .then((list) => {
+        const sorted = [...(list ?? [])].sort(
+          (x, y) => x.displayOrder - y.displayOrder
+        );
+        feedbackItemsCache.set(category, sorted);
+        if (!cancelled) setRatingItems(sorted);
+      })
+      .catch(() => {
+        if (!cancelled) setRatingItemsError("평가 항목을 불러오지 못했어요.");
+      })
+      .finally(() => {
+        if (!cancelled) setRatingItemsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applicant?.id]);
 
@@ -161,7 +342,10 @@ const ApplicantDetailModal: React.FC<Props> = ({
         return;
       }
       if (e.key === "Escape") onClose();
-      if (typing) return;
+      // 평가 셀 버튼 등 피드백 작성 영역에 포커스가 있을 때 ←/→ 로 지원자가
+      // 넘어가면서 작성 중이던 점수·텍스트가 날아가는 사고 방지
+      const inComposer = !!t?.closest?.("[data-feedback-composer]");
+      if (typing || inComposer) return;
       if (e.key === "ArrowRight" && onNext) onNext();
       if (e.key === "ArrowLeft" && onPrev) onPrev();
     };
@@ -184,26 +368,76 @@ const ApplicantDetailModal: React.FC<Props> = ({
   const photo = images[0]?.imageKey;
   const videos = a.videos ?? [];
 
-  const canSend = feedbackText.trim().length > 0 && !isSending;
+  // 항목 평가: 카테고리는 지원자 데이터로 자동 결정 (관리자가 고를 수 없음)
+  const ratingCategory = toFeedbackCategory(a.desiredPosition);
+  const ratingTotal = ratingItems.length;
+  const ratingRated = ratingItems.filter(
+    (it) => ratingScores[it.feedbackItemId]
+  ).length;
+  const ratingMissing = ratingTotal - ratingRated;
+  const ratingAvg = ratingRated
+    ? ratingItems.reduce(
+        (sum, it) => sum + (ratingScores[it.feedbackItemId] ?? 0),
+        0
+      ) / ratingRated
+    : 0;
+  // 항목 로딩 실패/빈 배열이면 텍스트만으로 전송 가능해야 하므로 전송 조건에서 제외
+  const ratingReady = !!ratingCategory && ratingTotal > 0 && !ratingItemsError;
+
+  const canSend =
+    feedbackText.trim().length > 0 &&
+    !isSending &&
+    (!REQUIRE_ALL_RATINGS || !ratingReady || ratingMissing === 0);
+
+  const toggleRatingScore = (feedbackItemId: number, value: number) => {
+    setSuccess(null);
+    setRatingScores((prev) => {
+      const next = { ...prev };
+      // 이미 선택된 같은 숫자를 다시 누르면 해제 (미평가로 되돌림)
+      if (next[feedbackItemId] === value) delete next[feedbackItemId];
+      else next[feedbackItemId] = value;
+      return next;
+    });
+  };
 
   const handleSend = async () => {
     if (!canSend) return;
     const ok = window.confirm(
-      "유저에게 피드백을 보내시겠습니까?\n유저의 기기에 알림이 전송됩니다.",
+      feedbackFinalized
+        ? "유저에게 피드백을 보내시겠습니까?\n유저의 기기에 알림이 전송됩니다."
+        : "피드백을 저장하시겠습니까?\n'피드백 마무리하기' 시점에 지원자에게 일괄 공개되고 알림이 발송됩니다.",
     );
     if (!ok) return;
     setError(null);
     setSuccess(null);
     setIsSending(true);
+    const itemScores = ratingReady
+      ? ratingItems
+          .filter((it) => ratingScores[it.feedbackItemId])
+          .map((it) => ({
+            feedbackItemId: it.feedbackItemId,
+            score: ratingScores[it.feedbackItemId],
+          }))
+      : [];
     try {
       const status = await sendApplicationFeedback({
         auditionId: a.auditionId,
         applicationId: a.id,
         textReview: feedbackText.trim(),
+        itemScores,
       });
       if (status >= 200 && status < 300) {
-        setSuccess("피드백을 전송했어요.");
+        setSuccess(
+          feedbackFinalized
+            ? itemScores.length > 0
+              ? "피드백과 항목 평가를 전송했어요."
+              : "피드백을 전송했어요."
+            : itemScores.length > 0
+              ? "피드백과 항목 평가를 저장했어요. '피드백 마무리하기' 시 지원자에게 공개됩니다."
+              : "피드백을 저장했어요. '피드백 마무리하기' 시 지원자에게 공개됩니다."
+        );
         setFeedbackText("");
+        setRatingScores({});
         await refreshFeedbacks();
       } else {
         setError("피드백 전송에 실패했어요. 다시 시도해 주세요.");
@@ -758,6 +992,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
           >
             {/* Send box */}
             <div
+              data-feedback-composer
               style={{
                 background: "#fafafc",
                 border: "1px solid var(--admin-border)",
@@ -768,35 +1003,311 @@ const ApplicantDetailModal: React.FC<Props> = ({
             >
               <div
                 style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "var(--admin-ink-2)",
-                  marginBottom: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 12,
+                  flexWrap: "wrap",
                 }}
               >
-                피드백 보내기
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--admin-ink-2)",
+                  }}
+                >
+                  피드백 보내기
+                </span>
+                {/* 카테고리를 판별할 수 없으면 세그먼트 자체를 렌더하지 않음 (텍스트만) */}
+                {ratingCategory && (
+                  <div
+                    style={{
+                      marginLeft: "auto",
+                      display: "flex",
+                      gap: 4,
+                      background: "#f0f0f4",
+                      padding: 3,
+                      borderRadius: 9,
+                    }}
+                  >
+                    <button
+                      onClick={() => setFeedbackTab("text")}
+                      style={ratingTabBtn(feedbackTab === "text")}
+                    >
+                      텍스트
+                      <span style={ratingTabBadge(feedbackTab === "text")}>
+                        {feedbackText.length}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setFeedbackTab("rating")}
+                      style={ratingTabBtn(feedbackTab === "rating")}
+                    >
+                      항목 평가
+                      <span style={ratingTabBadge(feedbackTab === "rating")}>
+                        {ratingRated}/{ratingTotal}
+                      </span>
+                    </button>
+                  </div>
+                )}
               </div>
-              <textarea
-                ref={textareaRef}
-                value={feedbackText}
-                onChange={(e) => setFeedbackText(e.target.value)}
-                placeholder="지원자에게 전달할 피드백을 작성해주세요."
-                rows={4}
-                style={{
-                  width: "100%",
-                  borderRadius: 10,
-                  border: "1px solid var(--admin-border)",
-                  padding: 12,
-                  fontSize: 14,
-                  fontFamily: "inherit",
-                  resize: "vertical",
-                  lineHeight: 1.5,
-                  outline: "none",
-                  background: "#fff",
-                  color: "var(--admin-ink)",
-                  minHeight: 96,
-                }}
-              />
+              {!ratingCategory || feedbackTab === "text" ? (
+                <textarea
+                  ref={textareaRef}
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                  placeholder="지원자에게 전달할 피드백을 작성해주세요."
+                  rows={4}
+                  style={{
+                    width: "100%",
+                    borderRadius: 10,
+                    border: "1px solid var(--admin-border)",
+                    padding: 12,
+                    fontSize: 14,
+                    fontFamily: "inherit",
+                    resize: "vertical",
+                    lineHeight: 1.55,
+                    outline: "none",
+                    background: "#fff",
+                    color: "var(--admin-ink)",
+                    minHeight: 150,
+                  }}
+                />
+              ) : (
+                <div>
+                  {ratingItemsLoading ? (
+                    <div style={ratingEmptyState}>평가 항목을 불러오는 중…</div>
+                  ) : ratingItemsError ? (
+                    <div style={ratingEmptyState}>{ratingItemsError}</div>
+                  ) : ratingTotal === 0 ? (
+                    <div style={ratingEmptyState}>등록된 평가 항목이 없습니다.</div>
+                  ) : (
+                    <>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 8,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span style={{ fontSize: 12, color: "var(--admin-ink-3)" }}>
+                          자산관리 &gt; 피드백 항목의{" "}
+                          <span style={{ fontWeight: 700, color: tone.fg }}>
+                            {type}
+                          </span>{" "}
+                          항목 {ratingTotal}개
+                        </span>
+                        <span
+                          style={{
+                            marginLeft: "auto",
+                            fontSize: 12,
+                            color: "var(--admin-ink-3)",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          1 미흡 → 5 탁월
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          background: "#fff",
+                          border: "1px solid var(--admin-border)",
+                          borderRadius: 10,
+                          overflow: "hidden",
+                        }}
+                      >
+                        {ratingItems.map((it, i) => {
+                          const cur = ratingScores[it.feedbackItemId] ?? 0;
+                          return (
+                            <div
+                              key={it.feedbackItemId}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                padding: "9px 12px",
+                                borderTop:
+                                  i === 0
+                                    ? "1px solid transparent"
+                                    : "1px solid #f2f2f7",
+                                background: cur ? "#fff" : "#fdfdfe",
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  flex: 1,
+                                  minWidth: 88,
+                                  fontSize: 13.5,
+                                  fontWeight: 600,
+                                  color: "var(--admin-ink)",
+                                }}
+                              >
+                                {it.name}
+                              </span>
+                              <div style={{ display: "flex", gap: 5 }}>
+                                {[1, 2, 3, 4, 5].map((v) => {
+                                  const sel = cur === v;
+                                  return (
+                                    <button
+                                      key={v}
+                                      onClick={() =>
+                                        toggleRatingScore(it.feedbackItemId, v)
+                                      }
+                                      aria-label={`${it.name} ${v}점`}
+                                      style={{
+                                        width: 38,
+                                        height: 32,
+                                        borderRadius: 8,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: 13,
+                                        fontVariantNumeric: "tabular-nums",
+                                        fontWeight: sel ? 700 : 600,
+                                        background: sel ? tone.fg : "#fff",
+                                        color: sel ? "#fff" : "var(--admin-ink-3)",
+                                        boxShadow: sel
+                                          ? `inset 0 0 0 1px ${tone.fg}`
+                                          : "inset 0 0 0 1px var(--admin-border)",
+                                        transition: "all .12s",
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      {v}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <span
+                                style={{
+                                  width: 58,
+                                  textAlign: "right",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  color: cur ? tone.fg : "#c9c9d1",
+                                }}
+                              >
+                                {cur ? SCORE_LABELS[cur] : "미평가"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 14,
+                          marginTop: 10,
+                          padding: "12px 14px",
+                          background: "#fff",
+                          border: "1px solid var(--admin-border)",
+                          borderRadius: 10,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "baseline",
+                            gap: 5,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: "var(--admin-ink-2)",
+                            }}
+                          >
+                            평균
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 23,
+                              fontWeight: 700,
+                              letterSpacing: -0.7,
+                              fontVariantNumeric: "tabular-nums",
+                              color: tone.fg,
+                            }}
+                          >
+                            {ratingRated ? ratingAvg.toFixed(1) : "—"}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 12.5,
+                              fontWeight: 600,
+                              color: "var(--admin-ink-3)",
+                            }}
+                          >
+                            / 5.0
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            flex: 1,
+                            minWidth: 130,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 5,
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: 5,
+                              borderRadius: 999,
+                              background: "#f0f0f4",
+                              overflow: "hidden",
+                            }}
+                          >
+                            <div
+                              style={{
+                                height: "100%",
+                                width: `${
+                                  ratingTotal
+                                    ? (ratingRated / ratingTotal) * 100
+                                    : 0
+                                }%`,
+                                borderRadius: 999,
+                                background: tone.fg,
+                                transition: "width .18s ease-out",
+                              }}
+                            />
+                          </div>
+                          <span
+                            style={{
+                              fontSize: 11.5,
+                              color: "var(--admin-ink-3)",
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            {ratingTotal}항목 중 {ratingRated}개 평가
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setRatingScores({})}
+                          style={{
+                            height: 30,
+                            padding: "0 11px",
+                            borderRadius: 8,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "var(--admin-ink-2)",
+                            background: "#f3f3f6",
+                            cursor: "pointer",
+                          }}
+                        >
+                          평가 초기화
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               <div
                 style={{
                   display: "flex",
@@ -807,7 +1318,16 @@ const ApplicantDetailModal: React.FC<Props> = ({
                 }}
               >
                 <span style={{ fontSize: 12, color: "var(--admin-ink-3)" }}>
-                  {feedbackText.length}자 · 지원자 앱으로 푸시 알림과 함께 전송됩니다.
+                  {`${feedbackText.length}자`}
+                  {ratingReady &&
+                    ` · 평가 ${ratingRated}/${ratingTotal}${
+                      REQUIRE_ALL_RATINGS && ratingMissing > 0
+                        ? ` · 미평가 ${ratingMissing}개`
+                        : ""
+                    }`}
+                  {feedbackFinalized
+                    ? " · 지원자 앱으로 푸시 알림과 함께 전송됩니다."
+                    : " · '피드백 마무리하기' 시점에 지원자에게 일괄 공개됩니다."}
                 </span>
                 <button
                   onClick={handleSend}
@@ -916,8 +1436,30 @@ const ApplicantDetailModal: React.FC<Props> = ({
                         gap: 8,
                       }}
                     >
-                      <span style={{ fontSize: 13, fontWeight: 700 }}>
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
                         {fb.reviewer?.userNickname ?? fb.reviewer?.userName ?? "관리자"}
+                        {!fb.publishedAt && (
+                          <span
+                            style={{
+                              fontSize: 10.5,
+                              fontWeight: 700,
+                              padding: "2px 7px",
+                              borderRadius: 999,
+                              background: "var(--admin-warn-tint)",
+                              color: "var(--admin-warn)",
+                            }}
+                          >
+                            공개 전
+                          </span>
+                        )}
                       </span>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         {fb.createdAt && (
@@ -951,6 +1493,9 @@ const ApplicantDetailModal: React.FC<Props> = ({
                         )}
                       </div>
                     </div>
+                    {!isEditing && (
+                      <FeedbackScoreChips scores={fb.itemScores} toneFg={tone.fg} />
+                    )}
                     {isEditing ? (
                       <>
                         <textarea
@@ -1121,6 +1666,12 @@ const ApplicantDetailModal: React.FC<Props> = ({
                         </span>
                       )}
                     </div>
+                    <FeedbackScoreChips
+                      scores={fb.itemScores}
+                      toneFg={
+                        (TYPE_TONE[fb.application?.desiredPosition ?? ""] ?? defaultTone).fg
+                      }
+                    />
                     <p
                       style={{
                         margin: 0,

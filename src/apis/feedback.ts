@@ -6,11 +6,18 @@ export const sendApplicationFeedback = async (body: {
     auditionId: number;
     applicationId: number;
     textReview: string;
+    /** 항목 평가 점수 (없으면 텍스트만 전송) */
+    itemScores?: { feedbackItemId: number; score: number }[];
   }) => {
     try {
       const res = await apiClient.post(
         `/auditions/${body.auditionId}/applications/${body.applicationId}/feedbacks`,
-        { textReview: body.textReview }
+        {
+          textReview: body.textReview,
+          ...(body.itemScores && body.itemScores.length > 0
+            ? { itemScores: body.itemScores }
+            : {}),
+        }
       );
       return res.status;
     } catch (error) {
@@ -42,6 +49,26 @@ export const getApplicantFeedbackHistory = async (
   try {
     const res = await apiClient.get<AuditionFeedbackList>(
       `/auditions/${auditionId}/applications/${applicationId}/feedbacks/history`
+    );
+    return res.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+// 오디션 피드백 마무리하기 — 대기(초안) 피드백 일괄 공개 + 지원자들에게 푸시 알림 발송
+export interface FinalizeAuditionFeedbacksResult {
+  publishedCount: number;
+  notifiedUserCount: number;
+  finalizedAt: string;
+}
+
+export const finalizeAuditionFeedbacks = async (
+  auditionId: number
+): Promise<FinalizeAuditionFeedbacksResult> => {
+  try {
+    const res = await apiClient.post<FinalizeAuditionFeedbacksResult>(
+      `/auditions/${auditionId}/feedbacks/finalize`
     );
     return res.data;
   } catch (error) {

@@ -318,6 +318,9 @@ const TermsTab: React.FC = () => {
 /* ================= 피드백 항목 탭 ================= */
 
 /* 카테고리별 절제된 액센트 — 동일 채도 0.14 / 명도 0.62, hue만 변경 (oklch) */
+// 앱 능력치 차트(육각형)가 6개 기준이라 카테고리당 피드백 항목은 최대 6개
+const MAX_FEEDBACK_ITEMS = 6;
+
 const FB_ACCENTS: Record<FeedbackItemCategory, { accent: string; tint: string }> = {
   RAP: { accent: "oklch(0.62 0.14 258)", tint: "oklch(0.62 0.14 258 / 0.09)" },
   VOCAL: { accent: "oklch(0.62 0.14 320)", tint: "oklch(0.62 0.14 320 / 0.09)" },
@@ -582,10 +585,12 @@ const FbCategoryCard: React.FC<{
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [focused, setFocused] = useState(false);
+  // 앱 능력치 차트(육각형)가 6개 기준이라 카테고리당 최대 6개까지만 등록
+  const isFull = items.length >= MAX_FEEDBACK_ITEMS;
 
   const submit = () => {
     const n = draft.trim();
-    if (!n) return;
+    if (!n || isFull) return;
     onAdd(n);
     setDraft("");
   };
@@ -658,7 +663,8 @@ const FbCategoryCard: React.FC<{
           </span>
           <input
             value={draft}
-            placeholder="새 항목 추가"
+            placeholder={isFull ? `최대 ${MAX_FEEDBACK_ITEMS}개까지 등록할 수 있어요` : "새 항목 추가"}
+            disabled={isFull}
             onChange={(e) => setDraft(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
@@ -672,12 +678,13 @@ const FbCategoryCard: React.FC<{
               fontSize: 14,
               outline: "none",
               color: "var(--admin-ink)",
+              cursor: isFull ? "not-allowed" : "text",
             }}
           />
           <button
             type="button"
             onClick={submit}
-            disabled={!draft.trim()}
+            disabled={!draft.trim() || isFull}
             style={{
               height: 30,
               padding: "0 14px",
@@ -686,9 +693,9 @@ const FbCategoryCard: React.FC<{
               fontWeight: 600,
               flexShrink: 0,
               transition: "all .12s",
-              background: draft.trim() ? accent : "transparent",
-              color: draft.trim() ? "#fff" : "var(--admin-ink-3)",
-              cursor: draft.trim() ? "pointer" : "default",
+              background: draft.trim() && !isFull ? accent : "transparent",
+              color: draft.trim() && !isFull ? "#fff" : "var(--admin-ink-3)",
+              cursor: draft.trim() && !isFull ? "pointer" : "default",
             }}
           >
             추가

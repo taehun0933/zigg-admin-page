@@ -23,6 +23,8 @@ export interface Audition {
   startDate: string;
   endDate: string;
   isAlwaysOn?: boolean;
+  /** 피드백 마무리(일괄 공개) 시각 — null/undefined 면 마무리 전 */
+  feedbackFinalizedAt?: string | null;
 }
 
 type Bucket = "alwaysOn" | "ongoing" | "upcoming" | "completed";

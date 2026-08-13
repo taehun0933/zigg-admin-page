@@ -17,6 +17,7 @@ import {
 import { countryNameKo } from "@/utils/countryName";
 import { cdnImage, cdnImgError } from "@/utils/cdnImage";
 import AdminIcon from "@/components/admin/AdminIcon";
+import HelpDot from "@/components/admin/HelpDot";
 
 interface Props {
   applicant: AuditionProfileType | null;
@@ -406,15 +407,6 @@ const ApplicantDetailModal: React.FC<Props> = ({
 
   const handleSend = async () => {
     if (!canSend) return;
-    const ok = window.confirm(
-      feedbackFinalized
-        ? "유저에게 피드백을 보내시겠습니까?\n유저의 기기에 알림이 전송됩니다."
-        : "피드백을 저장하시겠습니까?\n'피드백 마무리하기' 시점에 지원자에게 일괄 공개되고 알림이 발송됩니다.",
-    );
-    if (!ok) return;
-    setError(null);
-    setSuccess(null);
-    setIsSending(true);
     const itemScores = ratingReady
       ? ratingItems
           .filter((it) => ratingScores[it.feedbackItemId])
@@ -423,28 +415,69 @@ const ApplicantDetailModal: React.FC<Props> = ({
             score: ratingScores[it.feedbackItemId],
           }))
       : [];
+    // 지원자당 항목 평가는 1건 유지 — 이미 채점된 피드백이 있으면 추가가 아니라 그 피드백을 수정
+    const latestScored =
+      itemScores.length > 0
+        ? feedbacks.find(
+            (fb: any) => Array.isArray(fb.itemScores) && fb.itemScores.length > 0,
+          )
+        : undefined;
+
+    const ok = window.confirm(
+      latestScored
+        ? `이미 항목 평가가 있는 지원자입니다.\n기존 항목 평가 피드백이 지금 작성한 텍스트·점수로 수정됩니다.\n${
+            feedbackFinalized
+              ? "수정 내용은 지원자에게 바로 반영됩니다."
+              : "'피드백 마무리하기' 시점에 지원자에게 공개됩니다."
+          }`
+        : feedbackFinalized
+          ? "유저에게 피드백을 보내시겠습니까?\n유저의 기기에 알림이 전송됩니다."
+          : "피드백을 저장하시겠습니까?\n'피드백 마무리하기' 시점에 지원자에게 일괄 공개되고 알림이 발송됩니다.",
+    );
+    if (!ok) return;
+    setError(null);
+    setSuccess(null);
+    setIsSending(true);
     try {
-      const status = await sendApplicationFeedback({
-        auditionId: a.auditionId,
-        applicationId: a.id,
-        textReview: feedbackText.trim(),
-        itemScores,
-      });
-      if (status >= 200 && status < 300) {
+      if (latestScored) {
+        await updateAuditionFeedback({
+          auditionId: a.auditionId,
+          applicationId: a.id,
+          feedbackId: latestScored.id,
+          textReview: feedbackText.trim(),
+          itemScores,
+        });
         setSuccess(
           feedbackFinalized
-            ? itemScores.length > 0
-              ? "피드백과 항목 평가를 전송했어요."
-              : "피드백을 전송했어요."
-            : itemScores.length > 0
-              ? "피드백과 항목 평가를 저장했어요. '피드백 마무리하기' 시 지원자에게 공개됩니다."
-              : "피드백을 저장했어요. '피드백 마무리하기' 시 지원자에게 공개됩니다."
+            ? "항목 평가를 수정했어요. 지원자에게 바로 반영됩니다."
+            : "항목 평가를 수정했어요. '피드백 마무리하기' 시 지원자에게 공개됩니다.",
         );
         setFeedbackText("");
         setRatingScores({});
         await refreshFeedbacks();
       } else {
-        setError("피드백 전송에 실패했어요. 다시 시도해 주세요.");
+        const status = await sendApplicationFeedback({
+          auditionId: a.auditionId,
+          applicationId: a.id,
+          textReview: feedbackText.trim(),
+          itemScores,
+        });
+        if (status >= 200 && status < 300) {
+          setSuccess(
+            feedbackFinalized
+              ? itemScores.length > 0
+                ? "피드백과 항목 평가를 전송했어요."
+                : "피드백을 전송했어요."
+              : itemScores.length > 0
+                ? "피드백과 항목 평가를 저장했어요. '피드백 마무리하기' 시 지원자에게 공개됩니다."
+                : "피드백을 저장했어요. '피드백 마무리하기' 시 지원자에게 공개됩니다."
+          );
+          setFeedbackText("");
+          setRatingScores({});
+          await refreshFeedbacks();
+        } else {
+          setError("피드백 전송에 실패했어요. 다시 시도해 주세요.");
+        }
       }
     } catch (e: any) {
       setError(e?.message ?? "피드백 전송 중 오류가 발생했어요.");
@@ -1333,34 +1366,51 @@ const ApplicantDetailModal: React.FC<Props> = ({
                     ? " · 지원자 앱으로 푸시 알림과 함께 전송됩니다."
                     : " · '피드백 마무리하기' 시점에 지원자에게 일괄 공개됩니다."}
                 </span>
-                <button
-                  onClick={handleSend}
-                  disabled={!canSend}
+                <span
                   style={{
-                    height: 40,
-                    padding: "0 18px",
-                    borderRadius: 10,
-                    background: canSend ? "var(--admin-blue)" : "#c8d6f0",
-                    color: "#fff",
-                    fontWeight: 600,
-                    fontSize: 13,
-                    cursor: canSend ? "pointer" : "not-allowed",
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: 6,
-                    transition: "background .15s",
+                    gap: 8,
                     flexShrink: 0,
                   }}
                 >
-                  {isSending ? (
-                    "전송 중…"
-                  ) : (
-                    <>
-                      <AdminIcon name="speaker" size={14} />
-                      피드백 전송
-                    </>
-                  )}
-                </button>
+                  <button
+                    onClick={handleSend}
+                    disabled={!canSend}
+                    style={{
+                      height: 40,
+                      padding: "0 18px",
+                      borderRadius: 10,
+                      background: canSend ? "var(--admin-blue)" : "#c8d6f0",
+                      color: "#fff",
+                      fontWeight: 600,
+                      fontSize: 13,
+                      cursor: canSend ? "pointer" : "not-allowed",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      transition: "background .15s",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {isSending ? (
+                      "전송 중…"
+                    ) : (
+                      <>
+                        <AdminIcon name="speaker" size={14} />
+                        피드백 전송
+                      </>
+                    )}
+                  </button>
+                  <HelpDot placement="top">
+                    <b style={{ color: "var(--admin-ink)" }}>피드백 전송이 이렇게 동작해요</b>
+                    <br />· 텍스트와 항목 평가는 <b>한 건으로 함께</b> 전송됩니다.
+                    <br />· <b>텍스트만</b> 쓰면 새 텍스트 피드백이 아래에 계속 추가돼요.
+                    <br />· <b>항목 평가를 포함</b>했는데 이미 채점한 피드백이 있으면,
+                    추가가 아니라 <b>그 피드백이 수정</b>됩니다 (지원자당 평가 1건 유지).
+                    <br />· 마무리 전엔 <b>초안</b>으로 저장되고, 마무리 후엔 <b>즉시 전송</b>됩니다.
+                  </HelpDot>
+                </span>
               </div>
               {error && (
                 <div

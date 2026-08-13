@@ -23,6 +23,7 @@ import { finalizeAuditionFeedbacks } from "@/apis/feedback";
 import { countryNameKo } from "@/utils/countryName";
 import { cdnImage, cdnImgError } from "@/utils/cdnImage";
 import { Audition } from "@/app/audition/page";
+import HelpDot from "@/components/admin/HelpDot";
 
 const nfmt = (n: number) => n.toLocaleString("ko-KR");
 // Sticky 영역 합산(탑바 60 + 칩/필터 sticky 약 132). 스크롤 점프·인덱스 계산 시 사용.
@@ -535,6 +536,16 @@ const AuditionDetailPage: React.FC = () => {
                         : "피드백 마무리하기"}
                   </button>
                 )}
+                <HelpDot placement="bottom">
+                  <b style={{ color: "var(--admin-ink)" }}>피드백 마무리하기란?</b>
+                  <br />· 지금까지 저장된 <b>초안 피드백을 모든 지원자에게 일괄 공개</b>하고
+                  푸시 알림을 보냅니다.
+                  <br />· 마무리 시점 기준으로 <b>지원자 평균</b>(앱 능력치 비교선)이
+                  온전하게 계산돼요.
+                  <br />· 마무리 <b>이후</b>에 보내는 피드백은 저장 즉시 지원자에게
+                  전송됩니다.
+                  <br />· 항목 평가를 다시 보내면 추가가 아니라 <b>기존 평가가 수정</b>됩니다.
+                </HelpDot>
               </div>
             </div>
           </div>

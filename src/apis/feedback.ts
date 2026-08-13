@@ -92,11 +92,16 @@ export const updateAuditionFeedback = async (body: {
   applicationId: number;
   feedbackId: number;
   textReview: string;
+  /** 전달하면 기존 점수를 통째로 교체, 생략(null)하면 기존 점수 유지 */
+  itemScores?: { feedbackItemId: number; score: number }[];
 }) => {
   try {
     const res = await apiClient.patch(
       `/auditions/${body.auditionId}/applications/${body.applicationId}/feedbacks/${body.feedbackId}`,
-      { textReview: body.textReview }
+      {
+        textReview: body.textReview,
+        ...(body.itemScores ? { itemScores: body.itemScores } : {}),
+      }
     );
     return res.data;
   } catch (error) {

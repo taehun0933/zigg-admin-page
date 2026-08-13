@@ -153,7 +153,7 @@ const AuditionDetailPage: React.FC = () => {
   const handleFinalizeFeedbacks = async () => {
     if (finalizing) return;
     const ok = window.confirm(
-      "오디션 피드백을 마무리하시겠습니까?\n대기 중인 피드백이 모든 지원자에게 공개되고 푸시 알림이 발송됩니다.\n마무리 이후 보내는 피드백은 즉시 전송됩니다.",
+      `'${currentAudition?.title ?? "이"}' 오디션 피드백을 마무리하겠습니다!\n대기 중인 피드백이 모든 지원자에게 공개되고 푸시 알림이 발송됩니다.\n마무리 이후 보내는 피드백은 즉시 전송됩니다.`,
     );
     if (!ok) return;
     setFinalizing(true);
@@ -471,11 +471,25 @@ const AuditionDetailPage: React.FC = () => {
                 <button style={btnSecondary} onClick={() => router.push("/audition")}>
                   ← 목록
                 </button>
+                {/* 마무리하기(주 액션)와 구분되도록 틴트 버튼으로 한 단계 낮춤 — 크기는 동일 */}
                 <button
-                  style={btnPrimary}
+                  style={{
+                    ...btnSecondary,
+                    background: "var(--admin-blue-tint)",
+                    border: "1px solid transparent",
+                    color: "var(--admin-blue)",
+                  }}
                   onClick={() => router.push(`/audition/${id}/edit`)}
                 >
-                  <AdminIcon name="edit" size={14} /> 오디션 수정
+                  <AdminIcon
+                    name="edit"
+                    size={14}
+                    style={{
+                      filter:
+                        "brightness(0) saturate(100%) invert(38%) sepia(93%) saturate(2749%) hue-rotate(200deg) brightness(101%) contrast(105%)",
+                    }}
+                  />{" "}
+                  오디션 수정
                 </button>
                 {feedbackFinalizedAt ? (
                   <button
@@ -484,9 +498,13 @@ const AuditionDetailPage: React.FC = () => {
                       color: "#1f8a52",
                       background: "var(--admin-good-tint)",
                       border: "1px solid transparent",
-                      cursor: "default",
                     }}
                     title={`마무리 시각: ${feedbackFinalizedAt}`}
+                    onClick={() =>
+                      window.alert(
+                        "이미 피드백이 마무리된 오디션입니다.\n추가 피드백은 작성 완료 시 지원자에게 바로 전송됩니다.",
+                      )
+                    }
                   >
                     <AdminIcon name="gradient_check" size={14} /> 피드백 마무리 완료
                   </button>
@@ -498,6 +516,11 @@ const AuditionDetailPage: React.FC = () => {
                         finalizing || !finalizeStateKnown
                           ? "#c8d6f0"
                           : "var(--admin-blue)",
+                      // 주 액션 강조 — 크기 변경 없이 글로우로만 시선 유도
+                      boxShadow:
+                        finalizing || !finalizeStateKnown
+                          ? "none"
+                          : "0 4px 14px rgba(0,122,255,.38)",
                       cursor:
                         finalizing || !finalizeStateKnown ? "wait" : "pointer",
                     }}

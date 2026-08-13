@@ -45,7 +45,8 @@ const defaultTone = { tint: "var(--admin-blue-tint)", fg: "var(--admin-blue)" };
 
 /* ---------- 피드백 항목 평가 (1~5) ---------- */
 
-// 전체 항목을 채점해야 전송 가능. 부분 채점 허용으로 바꾸려면 false 로만 변경 (서버는 부분 배열도 수용)
+// 채점을 "시작했다면" 전체 항목을 채워야 전송 가능. 텍스트만 쓸 땐 채점 없이도 전송된다.
+// (부분 채점까지 허용하려면 false — 서버는 부분 배열도 수용)
 const REQUIRE_ALL_RATINGS = true;
 const SCORE_LABELS: Record<number, string> = {
   1: "미흡",
@@ -383,11 +384,14 @@ const ApplicantDetailModal: React.FC<Props> = ({
     : 0;
   // 항목 로딩 실패/빈 배열이면 텍스트만으로 전송 가능해야 하므로 전송 조건에서 제외
   const ratingReady = !!ratingCategory && ratingTotal > 0 && !ratingItemsError;
+  // 채점을 아예 안 했으면 텍스트만 전송 OK, 시작했으면 전 항목 완료 필요 (부분 채점 방지)
+  const ratingComplete =
+    !ratingReady || ratingRated === 0 || ratingMissing === 0;
 
   const canSend =
     feedbackText.trim().length > 0 &&
     !isSending &&
-    (!REQUIRE_ALL_RATINGS || !ratingReady || ratingMissing === 0);
+    (!REQUIRE_ALL_RATINGS || ratingComplete);
 
   const toggleRatingScore = (feedbackItemId: number, value: number) => {
     setSuccess(null);
@@ -1321,7 +1325,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
                   {`${feedbackText.length}자`}
                   {ratingReady &&
                     ` · 평가 ${ratingRated}/${ratingTotal}${
-                      REQUIRE_ALL_RATINGS && ratingMissing > 0
+                      REQUIRE_ALL_RATINGS && ratingRated > 0 && ratingMissing > 0
                         ? ` · 미평가 ${ratingMissing}개`
                         : ""
                     }`}

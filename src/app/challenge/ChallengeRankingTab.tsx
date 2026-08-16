@@ -180,6 +180,8 @@ export default function ChallengeRankingTab({
     () => challenges.find((c) => c.id === selectedId) ?? null,
     [challenges, selectedId]
   );
+  // 진행중인 챌린지는 순위가 계속 바뀌므로 종료 전 보상 지급을 막는다
+  const isOngoing = Boolean(selected?.isActive);
 
   useEffect(() => {
     if (challenges.length === 0) return;
@@ -527,7 +529,7 @@ export default function ChallengeRankingTab({
           {REWARD_RANKS.map((rank) => {
             const entry = winnerOf(rank);
             const prizeText = selected?.winnerPrizes?.find((p) => p.rank === rank)?.prize;
-            const disabled = !entry || Boolean(entry.reward) || !entry.reel.creator;
+            const disabled = isOngoing || !entry || Boolean(entry.reward) || !entry.reel.creator;
             return (
               <div
                 key={rank}
@@ -582,13 +584,32 @@ export default function ChallengeRankingTab({
           })}
 
           <button
-            style={{ ...btnPrimary, opacity: pendingGrants.length === 0 || invalidRanks.length > 0 ? 0.5 : 1 }}
-            disabled={pendingGrants.length === 0 || invalidRanks.length > 0 || granting}
+            style={{
+              ...btnPrimary,
+              opacity: isOngoing || pendingGrants.length === 0 || invalidRanks.length > 0 ? 0.5 : 1,
+            }}
+            disabled={isOngoing || pendingGrants.length === 0 || invalidRanks.length > 0 || granting}
             onClick={() => setConfirmOpen(true)}
           >
-            티켓 보상 지급하기
+            {isOngoing ? "진행중 — 종료 후 지급 가능" : "티켓 보상 지급하기"}
           </button>
-          {invalidRanks.length > 0 && (
+          {isOngoing && (
+            <div
+              style={{
+                border: "1px solid rgba(255,149,0,0.3)",
+                borderRadius: 10,
+                background: "rgba(255,149,0,0.08)",
+                color: "#c77700",
+                padding: "10px 12px",
+                fontSize: 12,
+                fontWeight: 700,
+                lineHeight: 1.55,
+              }}
+            >
+              진행중인 챌린지는 순위가 계속 바뀔 수 있어서, 챌린지가 종료된 뒤에 보상을 지급할 수 있어요.
+            </div>
+          )}
+          {!isOngoing && invalidRanks.length > 0 && (
             <div style={{ ...mutedText, color: "var(--admin-red)" }}>
               티켓 수는 1 이상의 정수만 입력할 수 있어요.
             </div>

@@ -22,6 +22,7 @@ import {
 import { getUrlForUploadImage, putImageToPresignedUrl } from "@/apis/media";
 import { getApiMode, type ApiMode } from "@/utils/apiConfig";
 import { getFileExtension, getImageDimensions } from "@/utils/media";
+import ChallengeRankingTab from "./ChallengeRankingTab";
 
 interface ChallengeFormState {
   id: number | null;
@@ -310,6 +311,7 @@ export default function ChallengePage() {
   const [form, setForm] = useState<ChallengeFormState | null>(null);
   const [apiMode, setApiModeState] = useState<ApiMode>("dev");
   const [allowOverlapInDev, setAllowOverlapInDev] = useState(false);
+  const [tab, setTab] = useState<"list" | "ranking">("list");
 
   useEffect(() => {
     setApiModeState(getApiMode());
@@ -486,9 +488,7 @@ export default function ChallengePage() {
 
     try {
       const deleted = await deleteChallenge(challenge.id);
-      setChallenges((prev) =>
-        prev.map((item) => (item.id === deleted.id ? deleted : item))
-      );
+      setChallenges((prev) => prev.filter((item) => item.id !== deleted.id));
       if (form?.id === challenge.id) setForm(null);
     } catch (e: any) {
       alert(e?.message ?? "챌린지 삭제에 실패했어요.");
@@ -509,11 +509,62 @@ export default function ChallengePage() {
           </>
         }
         action={
-          <button style={btnPrimary} onClick={() => setForm(createEmptyForm())}>
-            + 새 챌린지 생성
-          </button>
+          tab === "list" ? (
+            <button style={btnPrimary} onClick={() => setForm(createEmptyForm())}>
+              + 새 챌린지 생성
+            </button>
+          ) : undefined
         }
       >
+        {/* 서브탭 */}
+        <div
+          style={{
+            display: "flex",
+            gap: 18,
+            margin: "0 0 16px",
+            borderBottom: "1px solid var(--admin-border)",
+          }}
+        >
+          {[
+            { key: "list" as const, label: "챌린지 목록" },
+            { key: "ranking" as const, label: "랭킹 · 보상 지급" },
+          ].map((t) => {
+            const on = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                style={{
+                  position: "relative",
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  color: on ? "var(--admin-ink)" : "var(--admin-ink-3)",
+                  padding: "11px 2px",
+                }}
+              >
+                {t.label}
+                {on && (
+                  <span
+                    style={{
+                      position: "absolute", left: 0, right: 0, bottom: -1,
+                      height: 2, background: "var(--admin-blue)", borderRadius: 2,
+                    }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {tab === "ranking" && (
+          <ChallengeRankingTab
+            challenges={sortedChallenges}
+            challengesLoading={loading}
+            challengesError={error}
+          />
+        )}
+
+        {tab === "list" && (
         <div className="zg-split" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 18 }}>
           <section style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div style={{ ...adminCardStyle, padding: 18 }}>
@@ -671,6 +722,7 @@ export default function ChallengePage() {
             </div>
           </div>
         </div>
+        )}
       </PageShell>
 
       {form && (

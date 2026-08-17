@@ -697,12 +697,41 @@ export default function ChallengeRankingTab({
                   <span>
                     <MedalBadge rank={entry.rank} />
                   </span>
-                  <div style={{ display: "flex", gap: 10, minWidth: 0, alignItems: "center" }}>
-                    <Thumbnail entry={entry} width={42} height={56} />
+                  <button
+                    onClick={() => setVideoEntry(entry)}
+                    title="영상 보기"
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      minWidth: 0,
+                      alignItems: "center",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      padding: 0,
+                      background: "transparent",
+                    }}
+                  >
+                    <span style={{ position: "relative", flexShrink: 0, display: "block" }}>
+                      <Thumbnail entry={entry} width={42} height={56} />
+                      <span
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          display: "grid",
+                          placeItems: "center",
+                          background: "rgba(0,0,0,0.28)",
+                          borderRadius: 10,
+                          color: "#fff",
+                          fontSize: 12,
+                        }}
+                      >
+                        ▶
+                      </span>
+                    </span>
                     <span style={{ ...mutedText, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
                       {entry.reel.description || "설명 없음"}
                     </span>
-                  </div>
+                  </button>
                   <span style={{ fontWeight: 700, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
                     {creatorLabel(entry)}
                   </span>
@@ -757,20 +786,28 @@ export default function ChallengeRankingTab({
             <div
               style={{
                 width: "100%",
-                height: 480,
                 background: "#000",
                 borderRadius: 12,
                 overflow: "hidden",
-                display: "grid",
-                placeItems: "center",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 280,
               }}
             >
+              {/* 세로·가로 영상 모두 잘리지 않게 원본 비율 그대로 두고 최대 크기만 제한한다 */}
               <video
                 key={videoEntry.reel.id}
                 src={videoEntry.reel.video.url}
                 controls
                 playsInline
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                style={{
+                  display: "block",
+                  maxWidth: "100%",
+                  maxHeight: "min(62vh, 560px)",
+                  width: "auto",
+                  height: "auto",
+                }}
               >
                 동영상을 지원하지 않는 브라우저입니다.
               </video>

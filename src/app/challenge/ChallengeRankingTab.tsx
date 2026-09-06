@@ -860,16 +860,27 @@ export default function ChallengeRankingTab({
               style={{
                 display: "flex",
                 justifyContent: "flex-end",
+                alignItems: "center",
+                gap: 10,
                 borderTop: "1px solid var(--admin-border)",
                 paddingTop: 12,
               }}
             >
+              {/* 보상 지급 후 지우면 순위가 당겨져 같은 등수에 티켓이 다시 나갈 수 있어 서버에서도 막는다 */}
+              {videoEntry.reward && (
+                <span style={{ ...mutedText, textAlign: "right" }}>
+                  티켓 보상이 지급된 영상은 삭제할 수 없어요.
+                </span>
+              )}
               <button
                 style={{
                   ...btnSecondary,
                   color: "var(--admin-red-ink)",
                   borderColor: "var(--admin-red-tint)",
+                  opacity: videoEntry.reward ? 0.45 : 1,
+                  cursor: videoEntry.reward ? "not-allowed" : "pointer",
                 }}
+                disabled={Boolean(videoEntry.reward)}
                 onClick={() => setDeleteTarget(videoEntry)}
               >
                 <AdminIcon name="trashcan_red" size={15} />
@@ -926,7 +937,6 @@ export default function ChallengeRankingTab({
               }}
             >
               삭제하면 앱 릴스 피드와 챌린지 랭킹에서 바로 사라지고, 달린 댓글도 함께 삭제됩니다.
-              {deleteTarget.reward && " 이미 지급된 티켓 보상은 회수되지 않습니다."}
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <button style={btnSecondary} onClick={() => setDeleteTarget(null)} disabled={deleting}>

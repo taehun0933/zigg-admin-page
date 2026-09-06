@@ -52,3 +52,39 @@ export const broadcastInquiryPromptNotification = async (payload: {
     throw handleApiError(error);
   }
 };
+
+export interface AdminDirectNotificationRequest {
+  /** 발송 대상 유저 id 목록 (1개 이상, 최대 500명) */
+  userIds: number[];
+  title: string;
+  body: string;
+  /** 첨부 이미지 contentId 목록 (최대 5장) — 백엔드가 CDN URL 로 변환해 data.imageUrls 로 발송 */
+  imageIds?: number[];
+}
+
+export interface AdminDirectNotificationResponse {
+  /** 요청한 userIds 개수 */
+  requestedCount: number;
+  /** 실제 인앱 알림이 생성된(=발송된) 유저 수 */
+  sentCount: number;
+  /** 존재하지 않아 제외된 userId 목록 */
+  notFoundUserIds: number[];
+}
+
+/**
+ * 선택한 유저들에게만 알림(FCM push + 인앱 기록) 발송.
+ * 동기 처리라 응답으로 실제 발송 결과를 돌려받는다.
+ */
+export const sendDirectNotification = async (
+  payload: AdminDirectNotificationRequest
+): Promise<AdminDirectNotificationResponse> => {
+  try {
+    const res = await apiClient.post<AdminDirectNotificationResponse>(
+      "/notifications/direct",
+      payload
+    );
+    return res.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};

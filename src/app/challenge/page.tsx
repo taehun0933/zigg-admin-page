@@ -561,6 +561,16 @@ export default function ChallengePage() {
             challenges={sortedChallenges}
             challengesLoading={loading}
             challengesError={error}
+            onReelDeleted={(challengeId) =>
+              // 서버도 챌린지의 reelCount 를 줄이므로 목록 탭 참여 수를 함께 맞춘다
+              setChallenges((prev) =>
+                prev.map((item) =>
+                  item.id === challengeId
+                    ? { ...item, reelCount: Math.max(0, item.reelCount - 1) }
+                    : item
+                )
+              )
+            }
           />
         )}
 

@@ -156,12 +156,14 @@ interface ChallengeRankingTabProps {
   challenges: Challenge[];
   challengesLoading: boolean;
   challengesError: string | null;
+  onReelDeleted?: (challengeId: number) => void;
 }
 
 export default function ChallengeRankingTab({
   challenges,
   challengesLoading,
   challengesError,
+  onReelDeleted,
 }: ChallengeRankingTabProps) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [entries, setEntries] = useState<ChallengeRankingEntry[]>([]);
@@ -321,9 +323,16 @@ export default function ChallengeRankingTab({
       await deleteChallengeReel(selected.id, deleteTarget.reel.id);
       setDeleteTarget(null);
       setVideoEntry(null);
-      // 삭제된 영상은 랭킹에서 빠지므로 현재 페이지를 다시 불러온다
-      // (TOP 3 는 0페이지에만 있어서 그 페이지에서 지운 경우 함께 갱신된다)
-      await loadRanking(selected.id, page);
+      onReelDeleted?.(selected.id);
+      // 마지막 페이지의 마지막 영상을 지우면 빈 페이지에 갇히므로 한 페이지 앞으로
+      // (setPage 는 [selectedId, page] effect 가 재조회한다)
+      if (entries.length === 1 && page > 0) {
+        setPage(page - 1);
+      } else {
+        // 삭제된 영상은 랭킹에서 빠지므로 현재 페이지를 다시 불러온다
+        // (TOP 3 는 0페이지에만 있어서 그 페이지에서 지운 경우 함께 갱신된다)
+        await loadRanking(selected.id, page);
+      }
     } catch (e: any) {
       alert(e?.message ?? "영상 삭제에 실패했어요.");
     } finally {

@@ -14,6 +14,7 @@ import {
   UserTicketSummary,
   TicketLogType,
   TicketPurchase,
+  PaymentPlatform,
 } from "@/apis/ticket";
 
 const REASON_OPTIONS = [
@@ -25,12 +26,56 @@ const REASON_OPTIONS = [
 
 const PAGE_SIZE = 20;
 
+// 결제내역 테이블 컬럼 (헤더 · 데스크탑 행 공용)
+const PAY_GRID = "2fr 2fr 92px 90px 150px";
+
 const LOG_META: Record<TicketLogType, { label: string; sign: "+" | "-"; color: string }> = {
   PURCHASE: { label: "구매", sign: "+", color: "var(--admin-blue)" },
   ADMIN_ADJUSTMENT: { label: "관리자 지급", sign: "+", color: "#1f8a52" },
   AUDITION_CANCEL: { label: "오디션 취소 환급", sign: "+", color: "#1f8a52" },
+  CHALLENGE_REWARD: { label: "챌린지 보상", sign: "+", color: "#1f8a52" },
   REFUND: { label: "환불", sign: "-", color: "#cc3333" },
   USE: { label: "사용", sign: "-", color: "var(--admin-ink-2)" },
+};
+
+// 백엔드에 로그 타입이 추가돼도 화면이 죽지 않도록 폴백
+const logMeta = (type: TicketLogType) =>
+  LOG_META[type] ?? { label: type, sign: "+" as const, color: "var(--admin-ink-2)" };
+
+/**
+ * 결제 구분 칩.
+ * 실결제면 플랫폼(iOS/Android)을, 플랫폼을 모르는 옛 결제는 "실결제", 무료 지급은 "무료지급".
+ * (플랫폼은 payment_id 를 기록하기 시작한 시점 이후 결제부터 채워진다)
+ */
+const PAY_CHIP: Record<string, { label: string; bg: string; fg: string }> = {
+  IOS: { label: "iOS", bg: "#eef0f3", fg: "#3a3a42" },
+  ANDROID: { label: "Android", bg: "#eaf5ec", fg: "#1f8a52" },
+  PAID: { label: "실결제", bg: "var(--admin-blue-tint)", fg: "#0a63cc" },
+  FREE: { label: "무료지급", bg: "#f4f4f6", fg: "var(--admin-ink-3)" },
+};
+
+const payChipOf = (paid: boolean, platform: PaymentPlatform | null) =>
+  paid ? PAY_CHIP[platform ?? "PAID"] ?? PAY_CHIP.PAID : PAY_CHIP.FREE;
+
+const PayChip: React.FC<{ paid: boolean; platform: PaymentPlatform | null }> = ({ paid, platform }) => {
+  const chip = payChipOf(paid, platform);
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "3px 8px",
+        borderRadius: 6,
+        fontSize: 11,
+        fontWeight: 600,
+        lineHeight: 1.3,
+        whiteSpace: "nowrap",
+        background: chip.bg,
+        color: chip.fg,
+      }}
+    >
+      {chip.label}
+    </span>
+  );
 };
 
 const fmtDate = (iso: string) => iso.replace("T", " ").slice(0, 16);
@@ -356,7 +401,7 @@ const TicketPage: React.FC = () => {
                     <Empty>티켓 내역이 없습니다.</Empty>
                   ) : (
                     summary.logs.map((l, i) => {
-                      const meta = LOG_META[l.type];
+                      const meta = logMeta(l.type);
                       return (
                         <div
                           key={l.logId}
@@ -370,9 +415,12 @@ const TicketPage: React.FC = () => {
                           }}
                         >
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 12.5, fontWeight: 600 }}>
-                              {meta.label}
-                              <span style={{ color: "var(--admin-ink-3)", fontWeight: 400 }}> · {l.productName}</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600 }}>
+                              <span>
+                                {meta.label}
+                                <span style={{ color: "var(--admin-ink-3)", fontWeight: 400 }}> · {l.productName}</span>
+                              </span>
+                              {l.type === "PURCHASE" && <PayChip paid={l.paid} platform={l.platform} />}
                             </div>
                             <div style={{ fontSize: 11, color: "var(--admin-ink-3)", marginTop: 2 }}>{fmtDate(l.createdAt)}</div>
                           </div>
@@ -433,7 +481,7 @@ const TicketPage: React.FC = () => {
             className="zg-pay-head"
             style={{
               display: "grid",
-              gridTemplateColumns: "2fr 2fr 90px 150px",
+              gridTemplateColumns: PAY_GRID,
               gap: 10,
               padding: "10px 22px",
               fontSize: 11,
@@ -444,6 +492,7 @@ const TicketPage: React.FC = () => {
           >
             <span>유저</span>
             <span>상품</span>
+            <span>구분</span>
             <span style={{ textAlign: "right" }}>구매 매수</span>
             <span style={{ textAlign: "right" }}>결제일시</span>
           </div>
@@ -460,7 +509,7 @@ const TicketPage: React.FC = () => {
                   className="zg-pay-row"
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "2fr 2fr 90px 150px",
+                    gridTemplateColumns: PAY_GRID,
                     gap: 10,
                     padding: "12px 22px",
                     borderTop: i ? "1px solid var(--admin-border)" : "none",
@@ -476,6 +525,9 @@ const TicketPage: React.FC = () => {
                     </div>
                   </div>
                   <span style={{ color: "var(--admin-ink-2)" }}>{p.productName}</span>
+                  <span>
+                    <PayChip paid={p.paid} platform={p.platform} />
+                  </span>
                   <span style={{ textAlign: "right", fontWeight: 700, color: "var(--admin-blue)", fontVariantNumeric: "tabular-nums" }}>
                     {p.amount}
                   </span>
@@ -499,7 +551,12 @@ const TicketPage: React.FC = () => {
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{p.nickname ?? "-"}</div>
                     {p.userName && <div style={{ fontSize: 11, color: "var(--admin-ink-3)", marginTop: 1 }}>{p.userName}</div>}
-                    <div style={{ fontSize: 11, color: "var(--admin-ink-3)", marginTop: 2 }}>{p.productName}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+                      <PayChip paid={p.paid} platform={p.platform} />
+                      <span style={{ fontSize: 11, color: "var(--admin-ink-3)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {p.productName}
+                      </span>
+                    </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <span style={{ fontWeight: 700, color: "var(--admin-blue)", fontVariantNumeric: "tabular-nums" }}>{p.amount}</span>

@@ -47,6 +47,9 @@ export async function grantTickets(
 
 // ─── 결제내역 (구매 로그 기준) ────────────────────────────────────────────────
 
+/** 인앱 결제 플랫폼. 결제 건이 연결되지 않은 로그(무료 지급 · V1.7.3 이전 결제)는 null */
+export type PaymentPlatform = "IOS" | "ANDROID";
+
 export interface TicketPurchase {
   logId: number;
   userId: number;
@@ -55,6 +58,9 @@ export interface TicketPurchase {
   profileImageUrl: string | null;
   productName: string;
   amount: number;
+  /** 실제 인앱 결제인지 (false = 가입 축하 티켓 등 무료 지급) */
+  paid: boolean;
+  platform: PaymentPlatform | null;
   createdAt: string;
 }
 
@@ -89,13 +95,16 @@ export type TicketLogType =
   | "PURCHASE"
   | "AUDITION_CANCEL"
   | "REFUND"
-  | "ADMIN_ADJUSTMENT";
+  | "ADMIN_ADJUSTMENT"
+  | "CHALLENGE_REWARD";
 
 export interface TicketLogItem {
   logId: number;
   type: TicketLogType;
   amount: number;
   productName: string;
+  paid: boolean;
+  platform: PaymentPlatform | null;
   createdAt: string;
 }
 

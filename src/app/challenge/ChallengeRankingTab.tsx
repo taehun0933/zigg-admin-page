@@ -13,6 +13,7 @@ import {
   Challenge,
   ChallengeRankingEntry,
   ChallengeRewardGrant,
+  deleteChallengeReel,
   distributeChallengeRewards,
   getChallengeRanking,
 } from "@/apis/challenge";
@@ -174,6 +175,8 @@ export default function ChallengeRankingTab({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [granting, setGranting] = useState(false);
   const [videoEntry, setVideoEntry] = useState<ChallengeRankingEntry | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ChallengeRankingEntry | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const reqSeq = useRef(0);
 
   const selected = useMemo(
@@ -308,6 +311,23 @@ export default function ChallengeRankingTab({
       alert(e?.message ?? "티켓 지급에 실패했어요.");
     } finally {
       setGranting(false);
+    }
+  };
+
+  const handleDeleteReel = async () => {
+    if (!selected || !deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteChallengeReel(selected.id, deleteTarget.reel.id);
+      setDeleteTarget(null);
+      setVideoEntry(null);
+      // 삭제된 영상은 랭킹에서 빠지므로 현재 페이지를 다시 불러온다
+      // (TOP 3 는 0페이지에만 있어서 그 페이지에서 지운 경우 함께 갱신된다)
+      await loadRanking(selected.id, page);
+    } catch (e: any) {
+      alert(e?.message ?? "영상 삭제에 실패했어요.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -827,6 +847,94 @@ export default function ChallengeRankingTab({
                 {videoEntry.reel.description}
               </div>
             )}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                borderTop: "1px solid var(--admin-border)",
+                paddingTop: 12,
+              }}
+            >
+              <button
+                style={{
+                  ...btnSecondary,
+                  color: "var(--admin-red-ink)",
+                  borderColor: "var(--admin-red-tint)",
+                }}
+                onClick={() => setDeleteTarget(videoEntry)}
+              >
+                <AdminIcon name="trashcan_red" size={15} />
+                영상 삭제
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* 영상 삭제 확인 모달 */}
+      {deleteTarget && (
+        <Modal
+          isOpen={Boolean(deleteTarget)}
+          onClose={() => !deleting && setDeleteTarget(null)}
+          title="영상 삭제"
+          sizeMode="SMALL"
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ fontSize: 13, color: "var(--admin-ink-2)", lineHeight: 1.6 }}>
+              <strong>{creatorLabel(deleteTarget)}</strong> 님이 올린 영상이{" "}
+              <strong style={{ color: "var(--admin-red-ink)" }}>삭제</strong>됩니다. 그래도 괜찮으신가요?
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "10px 12px",
+                border: "1px solid var(--admin-border)",
+                borderRadius: 10,
+              }}
+            >
+              <Thumbnail entry={deleteTarget} width={40} height={54} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                  {deleteTarget.rank}위 · {creatorLabel(deleteTarget)}
+                </div>
+                <div style={{ ...mutedText, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                  {deleteTarget.reel.description || "설명 없음"}
+                </div>
+              </div>
+            </div>
+            <div
+              style={{
+                border: "1px solid var(--admin-red-tint)",
+                borderRadius: 10,
+                background: "var(--admin-red-tint)",
+                color: "var(--admin-red-ink)",
+                padding: "10px 12px",
+                fontSize: 12,
+                fontWeight: 700,
+                lineHeight: 1.55,
+              }}
+            >
+              삭제하면 앱 릴스 피드와 챌린지 랭킹에서 바로 사라지고, 달린 댓글도 함께 삭제됩니다.
+              {deleteTarget.reward && " 이미 지급된 티켓 보상은 회수되지 않습니다."}
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button style={btnSecondary} onClick={() => setDeleteTarget(null)} disabled={deleting}>
+                아니오
+              </button>
+              <button
+                style={{
+                  ...btnPrimary,
+                  background: "var(--admin-red)",
+                  opacity: deleting ? 0.6 : 1,
+                }}
+                onClick={handleDeleteReel}
+                disabled={deleting}
+              >
+                {deleting ? "삭제 중…" : "네, 삭제할게요"}
+              </button>
+            </div>
           </div>
         </Modal>
       )}

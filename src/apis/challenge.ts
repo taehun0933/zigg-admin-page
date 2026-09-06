@@ -199,6 +199,19 @@ export const getChallengeRanking = async (
   }
 };
 
+export const deleteChallengeReel = async (
+  challengeId: number,
+  reelId: number
+): Promise<void> => {
+  try {
+    await apiClient.delete(`/challenges/${challengeId}/reels/${reelId}`, {
+      baseURL: adminV1BaseUrl(),
+    });
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
 export const distributeChallengeRewards = async (
   challengeId: number,
   grants: ChallengeRewardGrant[]

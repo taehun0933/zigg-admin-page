@@ -72,14 +72,23 @@ export interface Page<T> {
   size: number;
 }
 
+/**
+ * @param paidOnly true 면 실결제만 (가입 축하 티켓 등 무료 지급 제외). 백엔드 기본은 false(전체).
+ */
 export async function getTicketPurchases(
   page: number,
   nickname?: string,
-  size = 20
+  size = 20,
+  paidOnly = false
 ): Promise<Page<TicketPurchase>> {
   try {
     const res = await apiClient.get("/tickets/purchases", {
-      params: { page, size, ...(nickname?.trim() ? { nickname: nickname.trim() } : {}) },
+      params: {
+        page,
+        size,
+        paidOnly,
+        ...(nickname?.trim() ? { nickname: nickname.trim() } : {}),
+      },
     });
     return res.data;
   } catch (e) {

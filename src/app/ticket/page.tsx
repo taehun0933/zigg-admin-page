@@ -26,6 +26,13 @@ const REASON_OPTIONS = [
 
 const PAGE_SIZE = 20;
 
+// 결제내역 기본 필터. 무료 지급(가입 축하 티켓 등)이 대부분이라 실결제만 보는 게 기본.
+const DEFAULT_PAID_ONLY = true;
+const PAID_FILTERS: { id: boolean; label: string }[] = [
+  { id: true, label: "실결제만" },
+  { id: false, label: "전체" },
+];
+
 // 결제내역 테이블 컬럼 (헤더 · 데스크탑 행 공용)
 const PAY_GRID = "2fr 2fr 92px 90px 150px";
 
@@ -104,6 +111,7 @@ const TicketPage: React.FC = () => {
 
   // ── 결제내역 목록 ─────────────────────────────────────
   const [purchaseQuery, setPurchaseQuery] = useState("");
+  const [paidOnly, setPaidOnly] = useState(DEFAULT_PAID_ONLY);
   const [purchases, setPurchases] = useState<TicketPurchase[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -124,10 +132,10 @@ const TicketPage: React.FC = () => {
     else setSummary(null);
   }, [selectedUser, loadSummary]);
 
-  const loadPurchases = useCallback(async (nextPage: number, query: string) => {
+  const loadPurchases = useCallback(async (nextPage: number, query: string, onlyPaid: boolean) => {
     setLoadingPurchases(true);
     try {
-      const res = await getTicketPurchases(nextPage, query, PAGE_SIZE);
+      const res = await getTicketPurchases(nextPage, query, PAGE_SIZE, onlyPaid);
       setPurchases(res.content);
       setPage(res.number);
       setTotalPages(res.totalPages);
@@ -138,7 +146,7 @@ const TicketPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadPurchases(0, "");
+    loadPurchases(0, "", DEFAULT_PAID_ONLY);
   }, [loadPurchases]);
 
   const handleSearch = async () => {
@@ -176,7 +184,7 @@ const TicketPage: React.FC = () => {
       setMemo("");
       // 지급 후 요약·결제내역 갱신
       loadSummary(selectedUser.userId);
-      loadPurchases(page, purchaseQuery);
+      loadPurchases(page, purchaseQuery, paidOnly);
     } catch {
       setError("티켓 지급에 실패했습니다.");
     } finally {
@@ -455,19 +463,57 @@ const TicketPage: React.FC = () => {
             <div style={{ flex: 1, minWidth: 180 }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>티켓 결제내역</div>
               <div style={{ fontSize: 12, color: "var(--admin-ink-3)", marginTop: 4 }}>
-                인앱 구매(PURCHASE) 기준 · 총 {totalElements.toLocaleString()}건
+                {paidOnly ? "실결제(인앱 구매)만" : "무료 지급 포함 전체"} · 총 {totalElements.toLocaleString()}건
               </div>
+            </div>
+            {/* 실결제만 / 전체 (비용 관리의 전체·수익·지출 토글과 같은 규격) */}
+            <div
+              style={{
+                display: "inline-flex",
+                gap: 4,
+                padding: 3,
+                background: "#f3f3f6",
+                borderRadius: 9,
+              }}
+            >
+              {PAID_FILTERS.map((f) => {
+                const active = paidOnly === f.id;
+                return (
+                  <button
+                    key={String(f.id)}
+                    onClick={() => {
+                      if (active) return;
+                      setPaidOnly(f.id);
+                      loadPurchases(0, purchaseQuery, f.id);
+                    }}
+                    disabled={loadingPurchases}
+                    style={{
+                      height: 32,
+                      padding: "0 16px",
+                      borderRadius: 6,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      whiteSpace: "nowrap",
+                      background: active ? "#fff" : "transparent",
+                      color: active ? "var(--admin-ink)" : "var(--admin-ink-2)",
+                      boxShadow: active ? "0 1px 2px rgba(0,0,0,.06)" : "none",
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <input
                 value={purchaseQuery}
                 onChange={(e) => setPurchaseQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && loadPurchases(0, purchaseQuery)}
+                onKeyDown={(e) => e.key === "Enter" && loadPurchases(0, purchaseQuery, paidOnly)}
                 placeholder="닉네임 검색"
                 style={{ ...inputStyle, width: 200 }}
               />
               <button
-                onClick={() => loadPurchases(0, purchaseQuery)}
+                onClick={() => loadPurchases(0, purchaseQuery, paidOnly)}
                 disabled={loadingPurchases}
                 style={{ ...btnSecondary, height: 40, whiteSpace: "nowrap" }}
               >
@@ -575,7 +621,7 @@ const TicketPage: React.FC = () => {
               page={page}
               totalPages={totalPages}
               loading={loadingPurchases}
-              onGo={(p) => loadPurchases(p, purchaseQuery)}
+              onGo={(p) => loadPurchases(p, purchaseQuery, paidOnly)}
             />
           )}
         </div>

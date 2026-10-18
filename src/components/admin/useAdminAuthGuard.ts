@@ -18,6 +18,10 @@ export function useAdminAuthGuard() {
       router.replace("/signin");
       return;
     }
+    // 트레이너는 관리자 화면 접근 불가 (트레이너 전용 메뉴 기획 중)
+    if (localStorage.getItem("role") === "TRAINER") {
+      return;
+    }
     setReady(true);
   }, [isLoggedIn, router]);
 

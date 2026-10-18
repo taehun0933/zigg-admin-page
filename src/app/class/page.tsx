@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
-import PageShell, { btnPrimary, btnSecondary } from "@/components/admin/PageShell";
-import Modal from "@/components/Modal";
+import PageShell from "@/components/admin/PageShell";
 import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
 import {
   EmptyState,
@@ -12,21 +12,18 @@ import {
   LectureGrid,
   SegmentTabs,
 } from "@/components/admin/LectureParts";
-import { Lecture, approveLecture, getLectures, rejectLecture } from "@/apis/lecture";
+import { Lecture, getLectures } from "@/apis/lecture";
 
 // 관리자 — 클래스 관리 (상단 탭: 클래스 신청 관리 | 클래스 관리)
 type Tab = "REQUESTS" | "LECTURES";
 
 const ClassPage: React.FC = () => {
   const ready = useAdminAuthGuard();
+  const router = useRouter();
   const [data, setData] = useState<Lecture[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("REQUESTS");
   const [openId, setOpenId] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
-  // 반려 사유 입력 모달
-  const [rejectTarget, setRejectTarget] = useState<Lecture | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,28 +53,6 @@ const ClassPage: React.FC = () => {
   const list = tab === "REQUESTS" ? requests : lectures;
   const open = data.find((l) => l.lectureId === openId) ?? null;
 
-  const openReject = (lecture: Lecture) => {
-    setOpenId(null);
-    setRejectReason("");
-    setRejectTarget(lecture);
-  };
-
-  const decide = async (id: number, action: "APPROVED" | "REJECTED", reason?: string) => {
-    setBusy(true);
-    try {
-      const updated =
-        action === "APPROVED" ? await approveLecture(id) : await rejectLecture(id, reason);
-      setData((d) => d.map((l) => (l.lectureId === id ? updated : l)));
-      setOpenId(null);
-      setRejectTarget(null);
-    } catch (err) {
-      console.error(err);
-      alert("처리에 실패했습니다. 다시 시도해주세요.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   if (!ready) return null;
 
   return (
@@ -89,10 +64,10 @@ const ClassPage: React.FC = () => {
           tab === "REQUESTS" ? (
             <>
               <strong style={{ color: "var(--admin-ink)" }}>{requests.length}건</strong> 승인 대기 중 ·
-              승인하면 앱에 바로 노출되고, 승인·반려 결과는 트레이너에게 메일로 안내돼요.
+              신청서를 열어 수강료·기간·노출 이미지와 영상을 확정한 뒤 공개해요.
             </>
           ) : (
-            "승인된 클래스 목록이에요. 시즌제는 종료일이 지나면 자동으로 마감돼요."
+            "공개된 클래스 목록이에요. 시즌제는 종료일이 지나면 자동으로 마감돼요."
           )
         }
       >
@@ -116,69 +91,21 @@ const ClassPage: React.FC = () => {
         ) : (
           <LectureGrid>
             {list.map((l) => (
-              <LectureCard key={l.lectureId} lecture={l} onOpen={() => setOpenId(l.lectureId)} />
+              <LectureCard
+                key={l.lectureId}
+                lecture={l}
+                onOpen={() =>
+                  tab === "REQUESTS"
+                    ? router.push(`/class/review?id=${l.lectureId}`)
+                    : setOpenId(l.lectureId)
+                }
+              />
             ))}
           </LectureGrid>
         )}
       </PageShell>
 
-      {open && (
-        <LectureDetailModal
-          lecture={open}
-          busy={busy}
-          onClose={() => setOpenId(null)}
-          onApprove={() => decide(open.lectureId, "APPROVED")}
-          onReject={() => openReject(open)}
-        />
-      )}
-
-      {rejectTarget && (
-        <Modal
-          isOpen={Boolean(rejectTarget)}
-          onClose={() => !busy && setRejectTarget(null)}
-          title="클래스 반려"
-          sizeMode="SMALL"
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ fontSize: 13, color: "var(--admin-ink-2)", lineHeight: 1.6 }}>
-              <strong>{rejectTarget.title}</strong> 클래스 신청을{" "}
-              <strong style={{ color: "var(--admin-red-ink)" }}>반려</strong>합니다. 입력한 사유는
-              트레이너에게 메일로 전달되고, 트레이너는 수정 후 다시 신청할 수 있어요.
-            </div>
-            <textarea
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              rows={4}
-              maxLength={255}
-              placeholder="반려 사유를 입력하세요. (선택)"
-              style={{
-                width: "100%",
-                borderRadius: 10,
-                border: "1px solid var(--admin-border)",
-                padding: "10px 12px",
-                fontSize: 13,
-                lineHeight: 1.55,
-                outline: "none",
-                resize: "vertical",
-              }}
-            />
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button style={btnSecondary} onClick={() => setRejectTarget(null)} disabled={busy}>
-                취소
-              </button>
-              <button
-                style={{ ...btnPrimary, background: "var(--admin-red)", opacity: busy ? 0.6 : 1 }}
-                onClick={() =>
-                  decide(rejectTarget.lectureId, "REJECTED", rejectReason.trim() || undefined)
-                }
-                disabled={busy}
-              >
-                {busy ? "처리 중…" : "반려하기"}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      {open && <LectureDetailModal lecture={open} onClose={() => setOpenId(null)} />}
     </AdminShell>
   );
 };

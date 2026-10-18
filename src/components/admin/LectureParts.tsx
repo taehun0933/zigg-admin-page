@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { Lecture, LectureStatus } from "@/apis/lecture";
+import { GENRE_LABEL, LEVEL_LABEL, Lecture, LectureStatus } from "@/apis/lecture";
 
 /* ===== 공용 포맷 ===== */
 
@@ -29,6 +29,9 @@ const todayKst = () =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
 const dayDiff = (from: string, to: string) =>
   Math.round((Date.parse(to) - Date.parse(from)) / 86400000);
+
+export const capacityText = (l: Lecture) =>
+  l.capacity === null ? "제한 없음" : `${l.capacity}명`;
 
 export const periodText = (l: Lecture) => {
   if (l.operationType === "ALWAYS") return "상시 운영";
@@ -224,6 +227,9 @@ export function LectureCard({
         >
           {lecture.title}
         </div>
+        <div style={{ fontSize: 12, color: "var(--admin-ink-2)" }}>
+          {GENRE_LABEL[lecture.genre]} · {LEVEL_LABEL[lecture.level]} · 모집 {capacityText(lecture)}
+        </div>
         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--admin-blue)" }}>
           {formatPrice(lecture.price)}
         </div>
@@ -272,20 +278,23 @@ export function LectureGrid({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ===== 상세 모달 (관리자 승인/반려) ===== */
+function MediaSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ paddingBottom: 14 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--admin-ink-3)", marginBottom: 8 }}>{title}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{children}</div>
+    </div>
+  );
+}
+
+/* ===== 상세 모달 (읽기 전용) ===== */
 
 export function LectureDetailModal({
   lecture,
   onClose,
-  onApprove,
-  onReject,
-  busy,
 }: {
   lecture: Lecture;
   onClose: () => void;
-  onApprove?: () => void;
-  onReject?: () => void;
-  busy?: boolean;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -295,7 +304,6 @@ export function LectureDetailModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const canDecide = lecture.status === "PENDING" && onApprove && onReject;
   const row = (label: string, value: React.ReactNode) => (
     <div style={{ display: "flex", gap: 12, fontSize: 13, padding: "8px 0", borderBottom: "1px solid var(--admin-border)" }}>
       <span style={{ width: 84, flexShrink: 0, color: "var(--admin-ink-3)", fontWeight: 600 }}>{label}</span>
@@ -352,6 +360,8 @@ export function LectureDetailModal({
             {lecture.title}
           </h2>
           {row("트레이너", lecture.trainerEmail ?? "-")}
+          {row("장르 / 난이도", `${GENRE_LABEL[lecture.genre]} · ${LEVEL_LABEL[lecture.level]}`)}
+          {row("모집 인원", capacityText(lecture))}
           {row("수강료", formatPrice(lecture.price))}
           {row("운영 방식", lecture.operationType === "ALWAYS" ? "상시 운영" : `시즌제 (${periodText(lecture)})`)}
           {row("신청일", formatYmd(lecture.createAt))}
@@ -359,52 +369,34 @@ export function LectureDetailModal({
           <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", padding: "14px 0" }}>
             {lecture.description}
           </div>
+          {lecture.images.length > 0 && (
+            <MediaSection title={`이미지 (${lecture.images.length})`}>
+              {lecture.images.map((img) => (
+                <a key={img.imageId} href={img.url} target="_blank" rel="noreferrer">
+                  <img
+                    src={img.url}
+                    alt=""
+                    style={{ width: 120, aspectRatio: "16 / 9", objectFit: "cover", borderRadius: 8, display: "block" }}
+                  />
+                </a>
+              ))}
+            </MediaSection>
+          )}
+          {lecture.introVideos.length > 0 && (
+            <MediaSection title={`소개 영상 (${lecture.introVideos.length})`}>
+              {lecture.introVideos.map((v) => (
+                <video
+                  key={v.videoId}
+                  src={v.url}
+                  poster={v.thumbnailUrl ?? undefined}
+                  controls
+                  playsInline
+                  style={{ width: 260, maxHeight: 240, borderRadius: 8, background: "#000" }}
+                />
+              ))}
+            </MediaSection>
+          )}
         </div>
-        {canDecide && (
-          <footer
-            style={{
-              padding: "14px 22px",
-              borderTop: "1px solid var(--admin-border)",
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 8,
-            }}
-          >
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onReject}
-              style={{
-                height: 38,
-                padding: "0 18px",
-                borderRadius: 9,
-                border: "1px solid var(--admin-border)",
-                background: "#fff",
-                color: "var(--admin-red-ink)",
-                fontWeight: 600,
-                fontSize: 13,
-              }}
-            >
-              반려
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onApprove}
-              style={{
-                height: 38,
-                padding: "0 18px",
-                borderRadius: 9,
-                background: "var(--admin-blue)",
-                color: "#fff",
-                fontWeight: 600,
-                fontSize: 13,
-              }}
-            >
-              승인
-            </button>
-          </footer>
-        )}
       </div>
     </div>
   );

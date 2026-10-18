@@ -7,29 +7,47 @@ import PageShell from "@/components/admin/PageShell";
 import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
 import { EmptyState } from "@/components/admin/LectureParts";
 import {
+  GENRE_LABEL,
+  LEVEL_LABEL,
+  LectureGenre,
+  LectureLevel,
   LectureOperationType,
+  MAX_LECTURE_IMAGES,
+  MAX_LECTURE_VIDEOS,
   createLecture,
   getMyLecture,
   updateLecture,
-  uploadLectureThumbnail,
+  uploadLectureImage,
+  uploadLectureVideo,
 } from "@/apis/lecture";
+
+// 업로드된 미디어 (id + 미리보기 URL)
+interface UploadedMedia {
+  id: number;
+  url: string;
+}
 
 const LectureApplyClient: React.FC<{ lectureId: number | null }> = ({ lectureId }) => {
   const ready = useAdminAuthGuard("TRAINER");
   const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const isEdit = lectureId !== null;
 
   const [loading, setLoading] = useState(isEdit);
   const [rejectReason, setRejectReason] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [genre, setGenre] = useState<LectureGenre | null>(null);
+  const [level, setLevel] = useState<LectureLevel | null>(null);
+  const [capacity, setCapacity] = useState("");
+  const [unlimited, setUnlimited] = useState(false);
   const [price, setPrice] = useState("");
   const [operationType, setOperationType] = useState<LectureOperationType>("ALWAYS");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [thumbnailId, setThumbnailId] = useState<number | null>(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [images, setImages] = useState<UploadedMedia[]>([]);
+  const [videos, setVideos] = useState<UploadedMedia[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,12 +60,16 @@ const LectureApplyClient: React.FC<{ lectureId: number | null }> = ({ lectureId 
         const l = await getMyLecture(lectureId);
         setTitle(l.title);
         setDescription(l.description);
+        setGenre(l.genre);
+        setLevel(l.level);
+        setUnlimited(l.capacity === null);
+        setCapacity(l.capacity === null ? "" : String(l.capacity));
         setPrice(String(l.price));
         setOperationType(l.operationType);
         setStartDate(l.startDate ?? "");
         setEndDate(l.endDate ?? "");
-        setThumbnailId(l.thumbnailImageId);
-        setThumbnailPreview(l.thumbnailImageUrl);
+        setImages(l.images.map((i) => ({ id: i.imageId, url: i.url })));
+        setVideos(l.introVideos.map((v) => ({ id: v.videoId, url: v.url })));
         setRejectReason(l.status === "REJECTED" ? l.rejectReason : null);
       } catch (err) {
         console.error(err);
@@ -58,48 +80,84 @@ const LectureApplyClient: React.FC<{ lectureId: number | null }> = ({ lectureId 
     })();
   }, [ready, lectureId]);
 
-  const onPickThumbnail = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // 시즌제는 모집 인원 제한 없음 불가
+  const changeOperationType = (type: LectureOperationType) => {
+    setOperationType(type);
+    if (type === "SEASON") setUnlimited(false);
+  };
+
+  const onPickImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []).slice(0, MAX_LECTURE_IMAGES - images.length);
     e.target.value = "";
-    if (!file) return;
+    if (files.length === 0) return;
     setUploading(true);
     setError(null);
     try {
-      const id = await uploadLectureThumbnail(file);
-      setThumbnailId(id);
-      setThumbnailPreview(URL.createObjectURL(file));
+      for (const file of files) {
+        const id = await uploadLectureImage(file);
+        setImages((prev) => [...prev, { id, url: URL.createObjectURL(file) }]);
+      }
     } catch (err) {
       console.error(err);
-      setError("썸네일 업로드에 실패했어요. 다시 시도해주세요.");
+      setError("이미지 업로드에 실패했어요. 다시 시도해주세요.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const onPickVideo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || videos.length >= MAX_LECTURE_VIDEOS) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const id = await uploadLectureVideo(file);
+      setVideos((prev) => [...prev, { id, url: URL.createObjectURL(file) }]);
+    } catch (err) {
+      console.error(err);
+      setError("영상 업로드에 실패했어요. 다시 시도해주세요.");
     } finally {
       setUploading(false);
     }
   };
 
   const priceNum = Number(price);
+  const capacityNum = Number(capacity);
   const periodInvalid =
     operationType === "SEASON" && (!startDate || !endDate || startDate > endDate);
+  const capacityInvalid = unlimited
+    ? operationType === "SEASON"
+    : capacity === "" || !Number.isInteger(capacityNum) || capacityNum < 1;
   const invalid =
     !title.trim() ||
     !description.trim() ||
+    !genre ||
+    !level ||
+    capacityInvalid ||
     price === "" ||
     !Number.isInteger(priceNum) ||
     priceNum < 0 ||
     periodInvalid;
+  const disabled = invalid || submitting || uploading;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (invalid || submitting || uploading) return;
+    if (disabled || !genre || !level) return;
     setSubmitting(true);
     setError(null);
     const req = {
       title: title.trim(),
       description: description.trim(),
+      genre,
+      level,
+      capacity: unlimited ? null : capacityNum,
       price: priceNum,
-      thumbnailImageId: thumbnailId,
       operationType,
       startDate: operationType === "SEASON" ? startDate : null,
       endDate: operationType === "SEASON" ? endDate : null,
+      imageIds: images.map((i) => i.id),
+      videoIds: videos.map((v) => v.id),
     };
     try {
       if (lectureId !== null) await updateLecture(lectureId, req);
@@ -119,7 +177,7 @@ const LectureApplyClient: React.FC<{ lectureId: number | null }> = ({ lectureId 
       <PageShell
         eyebrow="내 클래스"
         title={isEdit ? "클래스 수정 후 재신청" : "클래스 신청"}
-        subtitle="제출하면 관리자 승인 후 앱에 노출돼요. 결과는 로그인 이메일로 안내드려요."
+        subtitle="수강료·기간·노출 이미지와 영상은 관리자 검토 후 최종 확정돼요. 결과는 로그인 이메일로 안내드려요."
         maxWidth={760}
       >
         {loading ? (
@@ -172,41 +230,59 @@ const LectureApplyClient: React.FC<{ lectureId: number | null }> = ({ lectureId 
               />
             </Field>
 
-            <Field label="썸네일 (선택)">
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div
-                  style={{
-                    width: 160,
-                    aspectRatio: "16 / 9",
-                    borderRadius: 10,
-                    background: "#f3f3f6",
-                    overflow: "hidden",
-                    display: "grid",
-                    placeItems: "center",
-                    color: "var(--admin-ink-3)",
-                    fontSize: 12,
-                    flexShrink: 0,
-                  }}
-                >
-                  {thumbnailPreview ? (
-                    <img src={thumbnailPreview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : (
-                    "16:9 권장"
-                  )}
-                </div>
-                <button
-                  type="button"
-                  disabled={uploading}
-                  onClick={() => fileRef.current?.click()}
-                  style={secondaryBtn}
-                >
-                  {uploading ? "업로드 중…" : thumbnailPreview ? "이미지 변경" : "이미지 선택"}
-                </button>
-                <input ref={fileRef} type="file" accept="image/*" onChange={onPickThumbnail} hidden />
-              </div>
+            <Field label="장르">
+              <ChipGroup<LectureGenre>
+                options={(Object.keys(GENRE_LABEL) as LectureGenre[]).map((id) => ({ id, label: GENRE_LABEL[id] }))}
+                value={genre}
+                onChange={setGenre}
+              />
             </Field>
 
-            <Field label="수강료 (원)">
+            <Field label="난이도">
+              <ChipGroup<LectureLevel>
+                options={(Object.keys(LEVEL_LABEL) as LectureLevel[]).map((id) => ({ id, label: LEVEL_LABEL[id] }))}
+                value={level}
+                onChange={setLevel}
+              />
+            </Field>
+
+            <Field label={`이미지 (최대 ${MAX_LECTURE_IMAGES}장 · 첫 번째가 대표 이미지)`}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                {images.map((img, idx) => (
+                  <MediaThumb
+                    key={img.id}
+                    badge={idx === 0 ? "대표" : undefined}
+                    onRemove={() => setImages((prev) => prev.filter((i) => i.id !== img.id))}
+                  >
+                    <img src={img.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </MediaThumb>
+                ))}
+                {images.length < MAX_LECTURE_IMAGES && (
+                  <AddTile disabled={uploading} onClick={() => imageInputRef.current?.click()}>
+                    {uploading ? "업로드 중…" : `+ 이미지 (${images.length}/${MAX_LECTURE_IMAGES})`}
+                  </AddTile>
+                )}
+              </div>
+              <input ref={imageInputRef} type="file" accept="image/*" multiple onChange={onPickImages} hidden />
+            </Field>
+
+            <Field label={`소개 영상 (선택 · 최대 ${MAX_LECTURE_VIDEOS}개)`}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                {videos.map((v) => (
+                  <MediaThumb key={v.id} onRemove={() => setVideos((prev) => prev.filter((x) => x.id !== v.id))}>
+                    <video src={v.url} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", background: "#000" }} />
+                  </MediaThumb>
+                ))}
+                {videos.length < MAX_LECTURE_VIDEOS && (
+                  <AddTile disabled={uploading} onClick={() => videoInputRef.current?.click()}>
+                    {uploading ? "업로드 중…" : `+ 영상 (${videos.length}/${MAX_LECTURE_VIDEOS})`}
+                  </AddTile>
+                )}
+              </div>
+              <input ref={videoInputRef} type="file" accept="video/*" onChange={onPickVideo} hidden />
+            </Field>
+
+            <Field label="희망 수강료 (원)">
               <input
                 value={price}
                 onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ""))}
@@ -217,35 +293,14 @@ const LectureApplyClient: React.FC<{ lectureId: number | null }> = ({ lectureId 
             </Field>
 
             <Field label="운영 방식">
-              <div style={{ display: "flex", gap: 8 }}>
-                {(
-                  [
-                    { id: "ALWAYS", label: "상시 운영" },
-                    { id: "SEASON", label: "시즌제" },
-                  ] as const
-                ).map((o) => {
-                  const active = operationType === o.id;
-                  return (
-                    <button
-                      key={o.id}
-                      type="button"
-                      onClick={() => setOperationType(o.id)}
-                      style={{
-                        flex: 1,
-                        height: 42,
-                        borderRadius: 10,
-                        border: `1px solid ${active ? "var(--admin-blue)" : "var(--admin-border)"}`,
-                        background: active ? "var(--admin-blue-tint)" : "#fff",
-                        color: active ? "var(--admin-blue)" : "var(--admin-ink-2)",
-                        fontWeight: 600,
-                        fontSize: 14,
-                      }}
-                    >
-                      {o.label}
-                    </button>
-                  );
-                })}
-              </div>
+              <ChipGroup<LectureOperationType>
+                options={[
+                  { id: "ALWAYS", label: "상시 운영" },
+                  { id: "SEASON", label: "시즌제" },
+                ]}
+                value={operationType}
+                onChange={changeOperationType}
+              />
             </Field>
 
             {operationType === "SEASON" && (
@@ -274,6 +329,26 @@ const LectureApplyClient: React.FC<{ lectureId: number | null }> = ({ lectureId 
               </Field>
             )}
 
+            <Field label="모집 인원">
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <input
+                  value={unlimited ? "" : capacity}
+                  disabled={unlimited}
+                  onChange={(e) => setCapacity(e.target.value.replace(/[^0-9]/g, ""))}
+                  inputMode="numeric"
+                  placeholder={unlimited ? "제한 없음" : "예) 8"}
+                  style={{ ...inputStyle, maxWidth: 160, background: unlimited ? "#f3f3f6" : "#fff" }}
+                />
+                <span style={{ fontSize: 14, color: "var(--admin-ink-2)" }}>명</span>
+                {operationType === "ALWAYS" && (
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--admin-ink-2)", cursor: "pointer" }}>
+                    <input type="checkbox" checked={unlimited} onChange={(e) => setUnlimited(e.target.checked)} />
+                    제한 없음
+                  </label>
+                )}
+              </div>
+            </Field>
+
             {error && <div style={{ fontSize: 13, color: "var(--admin-red-ink)" }}>{error}</div>}
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
@@ -282,16 +357,16 @@ const LectureApplyClient: React.FC<{ lectureId: number | null }> = ({ lectureId 
               </button>
               <button
                 type="submit"
-                disabled={invalid || submitting || uploading}
+                disabled={disabled}
                 style={{
                   height: 42,
                   padding: "0 20px",
                   borderRadius: 10,
-                  background: invalid || submitting || uploading ? "#c4c4cc" : "var(--admin-blue)",
+                  background: disabled ? "#c4c4cc" : "var(--admin-blue)",
                   color: "#fff",
                   fontWeight: 700,
                   fontSize: 14,
-                  cursor: invalid || submitting || uploading ? "not-allowed" : "pointer",
+                  cursor: disabled ? "not-allowed" : "pointer",
                 }}
               >
                 {submitting ? "제출 중…" : isEdit ? "재신청" : "신청하기"}
@@ -310,6 +385,132 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span style={{ fontSize: 13, fontWeight: 600, color: "var(--admin-ink-2)" }}>{label}</span>
       {children}
     </div>
+  );
+}
+
+function ChipGroup<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { id: T; label: string }[];
+  value: T | null;
+  onChange: (id: T) => void;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 8 }}>
+      {options.map((o) => {
+        const active = value === o.id;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => onChange(o.id)}
+            style={{
+              flex: 1,
+              height: 42,
+              borderRadius: 10,
+              border: `1px solid ${active ? "var(--admin-blue)" : "var(--admin-border)"}`,
+              background: active ? "var(--admin-blue-tint)" : "#fff",
+              color: active ? "var(--admin-blue)" : "var(--admin-ink-2)",
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const tileSize: React.CSSProperties = {
+  width: 140,
+  aspectRatio: "16 / 9",
+  borderRadius: 10,
+  overflow: "hidden",
+  flexShrink: 0,
+};
+
+function MediaThumb({
+  children,
+  badge,
+  onRemove,
+}: {
+  children: React.ReactNode;
+  badge?: string;
+  onRemove: () => void;
+}) {
+  return (
+    <div style={{ ...tileSize, position: "relative", background: "#f3f3f6" }}>
+      {children}
+      {badge && (
+        <span
+          style={{
+            position: "absolute",
+            top: 6,
+            left: 6,
+            padding: "2px 7px",
+            borderRadius: 999,
+            background: "var(--admin-blue)",
+            color: "#fff",
+            fontSize: 10.5,
+            fontWeight: 700,
+          }}
+        >
+          {badge}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        title="삭제"
+        style={{
+          position: "absolute",
+          top: 6,
+          right: 6,
+          width: 22,
+          height: 22,
+          borderRadius: "50%",
+          background: "rgba(0,0,0,.55)",
+          color: "#fff",
+          fontSize: 13,
+          lineHeight: "22px",
+        }}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+function AddTile({
+  children,
+  disabled,
+  onClick,
+}: {
+  children: React.ReactNode;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        ...tileSize,
+        border: "1px dashed var(--admin-border)",
+        background: "#fafafc",
+        color: "var(--admin-ink-2)",
+        fontSize: 12.5,
+        fontWeight: 600,
+        cursor: disabled ? "not-allowed" : "pointer",
+      }}
+    >
+      {children}
+    </button>
   );
 }
 

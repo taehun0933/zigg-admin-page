@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { authService } from "@/apis/login";
 import ServerToggle from "@/components/admin/ServerToggle";
+import { getStoredRole, homePathOf } from "@/components/admin/useAdminAuthGuard";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -27,7 +28,7 @@ export default function SignInPage() {
     try {
       await authService.login(form.email, form.password);
       setIsLoggedIn(true);
-      router.push("/dashboard");
+      router.push(homePathOf(getStoredRole()));
     } catch (err) {
       const status = (err as { status?: number })?.status;
       const data = (err as { message?: unknown })?.message;

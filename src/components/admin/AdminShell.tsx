@@ -8,6 +8,7 @@ import ServerToggle from "./ServerToggle";
 import { useUnansweredInquiryCount } from "./useUnansweredInquiryCount";
 import { usePendingTrainerCount } from "./usePendingTrainerCount";
 import { useIsMobile } from "./useIsMobile";
+import { getStoredRole, homePathOf } from "./useAdminAuthGuard";
 
 interface NavItem {
   id: string;
@@ -28,8 +29,14 @@ const NAV: NavItem[] = [
   { id: "tickets", label: "티켓 관리", icon: "ticket", path: "/ticket" },
   { id: "voices", label: "고객 목소리함", icon: "mail", path: "/customerInquiry" },
   { id: "trainers", label: "트레이너 관리", icon: "people", path: "/trainer" },
+  { id: "lectures", label: "클래스 관리", icon: "video", path: "/class" },
   { id: "finance", label: "비용 관리", icon: "wallet", path: "/finance" },
   { id: "assets", label: "자산관리", icon: "document", path: "/asset" },
+];
+
+// 트레이너 로그인 시 메뉴 (관리자 메뉴는 노출하지 않음)
+const TRAINER_NAV: NavItem[] = [
+  { id: "myLectures", label: "내 클래스", icon: "video", path: "/my-class" },
 ];
 
 const SIDEBAR_KEY = "admin_sidebar_collapsed";
@@ -46,8 +53,13 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const unansweredCount = useUnansweredInquiryCount();
-  const trainerPendingCount = usePendingTrainerCount();
+  // AdminShell 은 가드 통과 후(클라이언트)에만 렌더되므로 localStorage 직접 접근 가능
+  const [role] = useState(getStoredRole);
+  const isTrainer = role === "TRAINER";
+  const nav = isTrainer ? TRAINER_NAV : NAV;
+  // 뱃지용 관리자 API 는 트레이너에게 403 이라 호출하지 않음
+  const unansweredCount = useUnansweredInquiryCount(!isTrainer);
+  const trainerPendingCount = usePendingTrainerCount(!isTrainer);
 
   // 로그인한 실제 계정 정보 (JWT 클레임에서 role/email 추출)
   const [account, setAccount] = useState<{ email: string; role: string }>({
@@ -116,12 +128,13 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("role");
     setIsLoggedIn(false);
     router.push("/signin");
   };
 
   const current =
-    NAV.find((n) => pathname === n.path || pathname.startsWith(n.path + "/")) ?? NAV[0];
+    nav.find((n) => pathname === n.path || pathname.startsWith(n.path + "/")) ?? nav[0];
 
   // 모바일에서는 드로어로 동작하므로 항상 펼친(레이블 보이는) 상태로 렌더
   const sidebarCollapsed = collapsed && !isMobile;
@@ -178,8 +191,8 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
         {/* Logo (click → dashboard) */}
         <button
           type="button"
-          onClick={() => router.push("/dashboard")}
-          title="대시보드로 이동"
+          onClick={() => router.push(homePathOf(role))}
+          title={isTrainer ? "내 클래스로 이동" : "대시보드로 이동"}
           style={{
             height: "var(--admin-topbar-h)",
             display: "flex",
@@ -249,7 +262,7 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
               운영 메뉴
             </div>
           )}
-          {NAV.map((item) => {
+          {nav.map((item) => {
             const active = item.id === current.id;
             const badgeCount =
               item.id === "voices"

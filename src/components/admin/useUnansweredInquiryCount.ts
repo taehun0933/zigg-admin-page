@@ -7,10 +7,11 @@ import { getCustomerInquiryMessages } from "@/apis/customerInquiry";
  * 미응답 고객 문의 건수.
  * 마운트(=새로고침) 시 한 번만 호출. 별도 count API 없어서 한 페이지(size 200) 받아 답장 0개 항목 카운트.
  */
-export function useUnansweredInquiryCount(): number {
+export function useUnansweredInquiryCount(enabled = true): number {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     (async () => {
       try {
@@ -25,7 +26,7 @@ export function useUnansweredInquiryCount(): number {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled]);
 
   return count;
 }

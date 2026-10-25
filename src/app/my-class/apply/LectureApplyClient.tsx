@@ -6,12 +6,14 @@ import AdminShell from "@/components/admin/AdminShell";
 import PageShell from "@/components/admin/PageShell";
 import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
 import { EmptyState } from "@/components/admin/LectureParts";
+import LectureWeeksEditor, { normalizeWeeks, weeksInvalid } from "@/components/admin/LectureWeeksEditor";
 import {
   GENRE_LABEL,
   LEVEL_LABEL,
   LectureGenre,
   LectureLevel,
   LectureOperationType,
+  LectureWeekInput,
   MAX_LECTURE_IMAGES,
   MAX_LECTURE_VIDEOS,
   createLecture,
@@ -48,6 +50,7 @@ const LectureApplyClient: React.FC<{ lectureId: number | null }> = ({ lectureId 
   const [endDate, setEndDate] = useState("");
   const [images, setImages] = useState<UploadedMedia[]>([]);
   const [videos, setVideos] = useState<UploadedMedia[]>([]);
+  const [weeks, setWeeks] = useState<LectureWeekInput[]>([{ title: "", description: null }]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +73,7 @@ const LectureApplyClient: React.FC<{ lectureId: number | null }> = ({ lectureId 
         setEndDate(l.endDate ?? "");
         setImages(l.images.map((i) => ({ id: i.imageId, url: i.url })));
         setVideos(l.introVideos.map((v) => ({ id: v.videoId, url: v.url })));
+        if (l.weeks.length > 0) setWeeks(l.weeks.map((w) => ({ title: w.title, description: w.description })));
         setRejectReason(l.status === "REJECTED" ? l.rejectReason : null);
       } catch (err) {
         console.error(err);
@@ -138,7 +142,8 @@ const LectureApplyClient: React.FC<{ lectureId: number | null }> = ({ lectureId 
     price === "" ||
     !Number.isInteger(priceNum) ||
     priceNum < 0 ||
-    periodInvalid;
+    periodInvalid ||
+    weeksInvalid(weeks);
   const disabled = invalid || submitting || uploading;
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -158,6 +163,7 @@ const LectureApplyClient: React.FC<{ lectureId: number | null }> = ({ lectureId 
       endDate: operationType === "SEASON" ? endDate : null,
       imageIds: images.map((i) => i.id),
       videoIds: videos.map((v) => v.id),
+      weeks: normalizeWeeks(weeks),
     };
     try {
       if (lectureId !== null) await updateLecture(lectureId, req);
@@ -228,6 +234,10 @@ const LectureApplyClient: React.FC<{ lectureId: number | null }> = ({ lectureId 
                 placeholder="커리큘럼, 대상, 진행 방식 등을 적어주세요."
                 style={{ ...inputStyle, height: "auto", padding: "10px 12px", resize: "vertical", lineHeight: 1.55 }}
               />
+            </Field>
+
+            <Field label="주차 구성 (승인 후에는 변경할 수 없어요)">
+              <LectureWeeksEditor value={weeks} onChange={setWeeks} />
             </Field>
 
             <Field label="장르">

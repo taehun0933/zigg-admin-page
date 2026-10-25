@@ -15,11 +15,13 @@ import {
   formatYmd,
   periodText,
 } from "@/components/admin/LectureParts";
+import LectureWeeksEditor, { normalizeWeeks, weeksInvalid } from "@/components/admin/LectureWeeksEditor";
 import {
   GENRE_LABEL,
   LEVEL_LABEL,
   Lecture,
   LectureOperationType,
+  LectureWeekInput,
   approveLecture,
   getLecture,
   rejectLecture,
@@ -44,6 +46,7 @@ const LectureReviewClient: React.FC<{ lectureId: number }> = ({ lectureId }) => 
   const [imageIds, setImageIds] = useState<number[]>([]); // 노출 이미지 (신청 순서 유지)
   const [thumbnailId, setThumbnailId] = useState<number | null>(null);
   const [videoIds, setVideoIds] = useState<number[]>([]);
+  const [weeks, setWeeks] = useState<LectureWeekInput[]>([]);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +69,7 @@ const LectureReviewClient: React.FC<{ lectureId: number }> = ({ lectureId }) => 
         setImageIds(l.images.map((i) => i.imageId));
         setThumbnailId(l.images[0]?.imageId ?? null);
         setVideoIds(l.introVideos.map((v) => v.videoId));
+        setWeeks(l.weeks.map((w) => ({ title: w.title, description: w.description })));
       } catch (err) {
         console.error(err);
         setLecture(null);
@@ -100,7 +104,12 @@ const LectureReviewClient: React.FC<{ lectureId: number }> = ({ lectureId }) => 
     ? operationType === "SEASON"
     : capacity === "" || !Number.isInteger(capacityNum) || capacityNum < 1;
   const invalid =
-    price === "" || !Number.isInteger(priceNum) || priceNum < 0 || periodInvalid || capacityInvalid;
+    price === "" ||
+    !Number.isInteger(priceNum) ||
+    priceNum < 0 ||
+    periodInvalid ||
+    capacityInvalid ||
+    weeksInvalid(weeks);
 
   const onApprove = async () => {
     if (!lecture || invalid || busy) return;
@@ -116,6 +125,7 @@ const LectureReviewClient: React.FC<{ lectureId: number }> = ({ lectureId }) => 
         imageIds,
         thumbnailImageId: thumbnailId,
         videoIds: lecture.introVideos.map((v) => v.videoId).filter((id) => videoIds.includes(id)),
+        weeks: normalizeWeeks(weeks),
       });
       router.replace("/class");
     } catch (err) {
@@ -147,7 +157,7 @@ const LectureReviewClient: React.FC<{ lectureId: number }> = ({ lectureId }) => 
       <PageShell
         eyebrow="클래스 신청 관리"
         title={lecture ? lecture.title : "클래스 신청서"}
-        subtitle="트레이너 신청서를 확인하고 수강료·기간·모집 인원·노출 이미지와 영상을 확정해 공개해요."
+        subtitle="트레이너 신청서를 확인하고 수강료·기간·모집 인원·노출 이미지와 영상·주차 구성을 확정해 공개해요."
         action={
           <button type="button" style={btnSecondary} onClick={() => router.push("/class")}>
             목록으로
@@ -180,6 +190,21 @@ const LectureReviewClient: React.FC<{ lectureId: number }> = ({ lectureId }) => 
               <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", padding: "14px 0" }}>
                 {lecture.description}
               </div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--admin-ink-3)", marginBottom: 8 }}>
+                주차 구성 ({lecture.weeks.length}주)
+              </div>
+              {lecture.weeks.length === 0 ? (
+                <span style={{ fontSize: 12.5, color: "var(--admin-ink-3)" }}>신청한 주차가 없어요.</span>
+              ) : (
+                lecture.weeks.map((w) => (
+                  <Row key={w.weekId} label={`${w.weekNo}주차`}>
+                    {w.title}
+                    {w.description && (
+                      <div style={{ fontSize: 12, color: "var(--admin-ink-3)", marginTop: 2 }}>{w.description}</div>
+                    )}
+                  </Row>
+                ))
+              )}
             </Panel>
 
             {/* 오른쪽: 최종값 */}
@@ -315,6 +340,10 @@ const LectureReviewClient: React.FC<{ lectureId: number }> = ({ lectureId }) => 
                       })}
                     </div>
                   )}
+                </Field>
+
+                <Field label="주차 구성 · 승인 후에는 변경할 수 없어요">
+                  <LectureWeeksEditor value={weeks} onChange={setWeeks} disabled={!pending} />
                 </Field>
 
                 {error && <div style={{ fontSize: 13, color: "var(--admin-red-ink)" }}>{error}</div>}

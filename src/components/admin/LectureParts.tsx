@@ -369,6 +369,14 @@ export function LectureDetailModal({
           <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", padding: "14px 0" }}>
             {lecture.description}
           </div>
+          {lecture.weeks.length > 0 && (
+            <div style={{ paddingBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--admin-ink-3)", marginBottom: 4 }}>
+                주차 구성 ({lecture.weeks.length}주)
+              </div>
+              {lecture.weeks.map((w) => row(`${w.weekNo}주차`, w.title))}
+            </div>
+          )}
           {lecture.images.length > 0 && (
             <MediaSection title={`이미지 (${lecture.images.length})`}>
               {lecture.images.map((img) => (

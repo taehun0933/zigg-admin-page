@@ -38,6 +38,20 @@ export interface LectureVideo {
   duration: string; // 초
 }
 
+// 주차 (신청서에 포함, 관리자 승인 시 확정 후 변경 불가)
+export interface LectureWeek {
+  weekId: number;
+  weekNo: number; // 1부터
+  title: string;
+  description: string | null;
+}
+
+// 주차 입력값. 순서 = 리스트 순서 (첫 번째가 1주차)
+export interface LectureWeekInput {
+  title: string;
+  description: string | null;
+}
+
 export interface Lecture {
   lectureId: number;
   trainerId: number;
@@ -51,6 +65,7 @@ export interface Lecture {
   thumbnailImageUrl: string | null;
   images: LectureImage[];
   introVideos: LectureVideo[];
+  weeks: LectureWeek[];
   operationType: LectureOperationType;
   startDate: string | null; // yyyy-MM-dd
   endDate: string | null;
@@ -71,6 +86,7 @@ export interface LectureRequest {
   endDate: string | null;
   imageIds: number[];
   videoIds: number[];
+  weeks: LectureWeekInput[];
 }
 
 /* ===== 트레이너 — 내 클래스 ===== */
@@ -95,15 +111,18 @@ export async function uploadLectureImage(file: File): Promise<number> {
   }
 }
 
-// 소개 영상 업로드 → contentId 반환
-export async function uploadLectureVideo(file: File): Promise<number> {
+// 소개 영상(LECTURE_VIDEO) / 주차 레퍼런스(LECTURE_REFERENCE) 업로드 → contentId 반환
+export async function uploadLectureVideo(
+  file: File,
+  purpose: "LECTURE_VIDEO" | "LECTURE_REFERENCE" = "LECTURE_VIDEO"
+): Promise<number> {
   try {
     const sec = await getVideoDurationSec(file);
     const body = { videoDuration: String(sec), videoExtension: getFileExtension(file) };
     const { data } = await apiClient.post<{ contentId: number; url: string }>(
       "/contents/video",
       body,
-      { baseURL: appApiBaseUrl(), params: { purpose: "LECTURE_VIDEO" } }
+      { baseURL: appApiBaseUrl(), params: { purpose } }
     );
     await putFileToPresignedUrl(data.url, file);
     return data.contentId;
@@ -152,6 +171,60 @@ export async function updateLecture(
   }
 }
 
+/* ===== 트레이너 — 주차별 레퍼런스 ===== */
+
+export interface LectureReference {
+  referenceId: number;
+  title: string;
+  video: LectureVideo;
+  createAt: string;
+}
+
+export interface LectureWeekDetail extends LectureWeek {
+  references: LectureReference[];
+}
+
+export async function getLectureWeeks(lectureId: number): Promise<LectureWeekDetail[]> {
+  try {
+    const { data } = await apiClient.get<LectureWeekDetail[]>(`/trainer/lectures/${lectureId}/weeks`);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+// 운영 중(APPROVED) 클래스만 가능. 갱신된 주차 반환
+export async function addLectureReference(
+  lectureId: number,
+  weekId: number,
+  req: { title: string; videoId: number }
+): Promise<LectureWeekDetail> {
+  try {
+    const { data } = await apiClient.post<LectureWeekDetail>(
+      `/trainer/lectures/${lectureId}/weeks/${weekId}/references`,
+      req
+    );
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+export async function deleteLectureReference(
+  lectureId: number,
+  weekId: number,
+  referenceId: number
+): Promise<LectureWeekDetail> {
+  try {
+    const { data } = await apiClient.delete<LectureWeekDetail>(
+      `/trainer/lectures/${lectureId}/weeks/${weekId}/references/${referenceId}`
+    );
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
 /* ===== 관리자 — 클래스 관리 ===== */
 
 export async function getLectures(status?: LectureStatus): Promise<Lecture[]> {
@@ -184,6 +257,7 @@ export interface LectureApproveRequest {
   imageIds: number[];
   thumbnailImageId: number | null;
   videoIds: number[];
+  weeks: LectureWeekInput[];
 }
 
 // 최종값 확정 후 공개

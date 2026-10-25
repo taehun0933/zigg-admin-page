@@ -137,7 +137,27 @@ const MyClassPage: React.FC = () => {
                     >
                       {l.status === "REJECTED" ? "수정 후 재신청" : "신청 내용 수정"}
                     </button>
-                  ) : undefined
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/my-class/weeks?id=${l.lectureId}`);
+                      }}
+                      style={{
+                        width: "100%",
+                        height: 34,
+                        borderRadius: 8,
+                        border: "1px solid var(--admin-border)",
+                        background: "#fff",
+                        color: "var(--admin-ink-2)",
+                        fontWeight: 600,
+                        fontSize: 12.5,
+                      }}
+                    >
+                      주차별 레퍼런스 관리
+                    </button>
+                  )
                 }
               />
             ))}

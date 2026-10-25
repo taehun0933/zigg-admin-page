@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
 import PageShell, { adminCardStyle, btnPrimary, btnSecondary, inputStyle } from "@/components/admin/PageShell";
 import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
-import { EmptyState, LectureStatusChip, capacityText, formatYmd } from "@/components/admin/LectureParts";
+import {
+  EmptyState,
+  LectureDetailModal,
+  LectureStatusChip,
+  capacityText,
+  formatYmd,
+} from "@/components/admin/LectureParts";
 import {
   Lecture,
   LectureStudent,
@@ -34,6 +40,7 @@ const LectureStudentsAdminClient: React.FC<{ lectureId: number | null }> = ({ le
   const [keyword, setKeyword] = useState("");
   const [results, setResults] = useState<AdminUserSearchResult[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -111,9 +118,16 @@ const LectureStudentsAdminClient: React.FC<{ lectureId: number | null }> = ({ le
             : undefined
         }
         action={
-          <button type="button" style={btnSecondary} onClick={() => router.push("/class")}>
-            목록으로
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            {lecture && (
+              <button type="button" style={btnSecondary} onClick={() => setInfoOpen(true)}>
+                클래스 정보
+              </button>
+            )}
+            <button type="button" style={btnSecondary} onClick={() => router.push("/class")}>
+              목록으로
+            </button>
+          </div>
         }
       >
         {loading ? (
@@ -216,6 +230,8 @@ const LectureStudentsAdminClient: React.FC<{ lectureId: number | null }> = ({ le
           </div>
         )}
       </PageShell>
+
+      {infoOpen && lecture && <LectureDetailModal lecture={lecture} onClose={() => setInfoOpen(false)} />}
     </AdminShell>
   );
 };

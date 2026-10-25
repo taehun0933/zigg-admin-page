@@ -8,7 +8,6 @@ import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
 import {
   EmptyState,
   LectureCard,
-  LectureDetailModal,
   LectureGrid,
   SegmentTabs,
 } from "@/components/admin/LectureParts";
@@ -25,7 +24,6 @@ const ClassPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("LECTURES");
   const [trainer, setTrainer] = useState<string>(ALL_TRAINERS); // trainerId
-  const [openId, setOpenId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,7 +66,6 @@ const ClassPage: React.FC = () => {
     [filtered]
   );
   const list = tab === "REQUESTS" ? requests : lectures;
-  const open = data.find((l) => l.lectureId === openId) ?? null;
 
   if (!ready) return null;
 
@@ -136,7 +133,7 @@ const ClassPage: React.FC = () => {
                 onOpen={() =>
                   tab === "REQUESTS"
                     ? router.push(`/class/review?id=${l.lectureId}`)
-                    : setOpenId(l.lectureId)
+                    : router.push(`/class/students?id=${l.lectureId}`)
                 }
                 footer={
                   tab === "LECTURES" ? (
@@ -167,7 +164,6 @@ const ClassPage: React.FC = () => {
         )}
       </PageShell>
 
-      {open && <LectureDetailModal lecture={open} onClose={() => setOpenId(null)} />}
     </AdminShell>
   );
 };

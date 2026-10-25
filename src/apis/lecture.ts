@@ -225,6 +225,123 @@ export async function deleteLectureReference(
   }
 }
 
+/* ===== 수강생 · 과제 · 피드백 ===== */
+
+// 주차별 제출 현황 (제출한 주차만)
+export interface LectureSubmissionSummary {
+  submissionId: number;
+  weekId: number;
+  weekNo: number;
+  submittedAt: string;
+  feedbackCount: number;
+}
+
+export interface LectureStudent {
+  userId: number;
+  name: string | null;
+  nickname: string | null;
+  profileImageUrl: string | null;
+  enrolledAt: string;
+  submissions: LectureSubmissionSummary[];
+}
+
+export interface LectureFeedback {
+  feedbackId: number;
+  timeline: string | null; // "mm:ss"
+  message: string;
+  authorId: number;
+  authorNickname: string | null;
+  authorProfileImageUrl: string | null;
+  createAt: string;
+}
+
+export interface LectureSubmission {
+  submissionId: number;
+  weekId: number;
+  weekNo: number;
+  studentId: number;
+  studentNickname: string | null;
+  video: LectureVideo;
+  submittedAt: string;
+  feedbacks: LectureFeedback[];
+}
+
+// 트레이너 — 내 클래스 수강생 + 주차별 제출 현황
+export async function getMyLectureStudents(lectureId: number): Promise<LectureStudent[]> {
+  try {
+    const { data } = await apiClient.get<LectureStudent[]>(`/trainer/lectures/${lectureId}/students`);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+export async function getLectureSubmission(
+  lectureId: number,
+  submissionId: number
+): Promise<LectureSubmission> {
+  try {
+    const { data } = await apiClient.get<LectureSubmission>(
+      `/trainer/lectures/${lectureId}/submissions/${submissionId}`
+    );
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+// 트레이너 — 주차별 제출 영상 전체 (주차 → 제출 순)
+export async function getLectureSubmissions(lectureId: number): Promise<LectureSubmission[]> {
+  try {
+    const { data } = await apiClient.get<LectureSubmission[]>(`/trainer/lectures/${lectureId}/submissions`);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+// 관리자 — 주차별 제출 영상 전체 (조회 전용)
+export async function getLectureSubmissionsForAdmin(lectureId: number): Promise<LectureSubmission[]> {
+  try {
+    const { data } = await apiClient.get<LectureSubmission[]>(`/lectures/${lectureId}/submissions`);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+// 피드백 작성 → 수강생에게 알림. 갱신된 제출물 반환
+export async function addLectureFeedback(
+  lectureId: number,
+  submissionId: number,
+  req: { timeline: string | null; message: string }
+): Promise<LectureSubmission> {
+  try {
+    const { data } = await apiClient.post<LectureSubmission>(
+      `/trainer/lectures/${lectureId}/submissions/${submissionId}/feedbacks`,
+      req
+    );
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+export async function deleteLectureFeedback(
+  lectureId: number,
+  submissionId: number,
+  feedbackId: number
+): Promise<LectureSubmission> {
+  try {
+    const { data } = await apiClient.delete<LectureSubmission>(
+      `/trainer/lectures/${lectureId}/submissions/${submissionId}/feedbacks/${feedbackId}`
+    );
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
 /* ===== 관리자 — 클래스 관리 ===== */
 
 export async function getLectures(status?: LectureStatus): Promise<Lecture[]> {
@@ -281,6 +398,47 @@ export async function rejectLecture(
     const { data } = await apiClient.post<Lecture>(`/lectures/${lectureId}/reject`, {
       reason,
     });
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+/* ===== 관리자 — 수강생 (결제 연동 전까지 관리자가 등록) ===== */
+
+export async function getLectureStudents(lectureId: number): Promise<LectureStudent[]> {
+  try {
+    const { data } = await apiClient.get<LectureStudent[]>(`/lectures/${lectureId}/students`);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+// 운영 중 클래스에 일반 유저만, 정원 안에서. 갱신된 수강생 목록 반환
+// 관리자 — 주차별 레퍼런스 영상 (조회만)
+export async function getLectureWeeksForAdmin(lectureId: number): Promise<LectureWeekDetail[]> {
+  try {
+    const { data } = await apiClient.get<LectureWeekDetail[]>(`/lectures/${lectureId}/weeks`);
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+export async function enrollLectureStudent(lectureId: number, userId: number): Promise<LectureStudent[]> {
+  try {
+    const { data } = await apiClient.post<LectureStudent[]>(`/lectures/${lectureId}/students`, { userId });
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+// 수강 해제 (제출 과제·피드백은 보존)
+export async function unenrollLectureStudent(lectureId: number, userId: number): Promise<LectureStudent[]> {
+  try {
+    const { data } = await apiClient.delete<LectureStudent[]>(`/lectures/${lectureId}/students/${userId}`);
     return data;
   } catch (error) {
     throw handleApiError(error);

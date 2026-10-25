@@ -155,7 +155,7 @@ const MyClassPage: React.FC = () => {
                         fontSize: 12.5,
                       }}
                     >
-                      주차별 레퍼런스 관리
+                      주차·수강생 관리
                     </button>
                   )
                 }

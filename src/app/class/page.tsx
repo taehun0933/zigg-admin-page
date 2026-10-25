@@ -138,6 +138,29 @@ const ClassPage: React.FC = () => {
                     ? router.push(`/class/review?id=${l.lectureId}`)
                     : setOpenId(l.lectureId)
                 }
+                footer={
+                  tab === "LECTURES" ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/class/students?id=${l.lectureId}`);
+                      }}
+                      style={{
+                        width: "100%",
+                        height: 34,
+                        borderRadius: 8,
+                        border: "1px solid var(--admin-border)",
+                        background: "#fff",
+                        color: "var(--admin-ink-2)",
+                        fontWeight: 600,
+                        fontSize: 12.5,
+                      }}
+                    >
+                      주차 영상 · 수강생
+                    </button>
+                  ) : undefined
+                }
               />
             ))}
           </LectureGrid>

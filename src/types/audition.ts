@@ -22,6 +22,7 @@ export interface AuditionProfileType {
   auditionId: number;
   createdAt: string; // ISO string
   acceptFeedback: boolean;
+  feedbackType?: "NONE" | "BASIC" | "ADVANCED";
   hasFeedback?: boolean; // 트레이너 피드백이 1건 이상 작성됐는지 ("피드백 완료" 표시용)
 }
 
@@ -53,6 +54,13 @@ export interface FeedbackItemScore {
   score: number; // 1..5
 }
 
+export interface FeedbackPin {
+  id?: number;
+  videoId: number;
+  positionMs: number;
+  message: string;
+}
+
 export interface AuditionFeedback {
   id: number;
   textReview: string;
@@ -63,6 +71,9 @@ export interface AuditionFeedback {
   itemScores?: FeedbackItemScore[];
   /** 지원자에게 공개된 시각 — null 이면 마무리 전 초안 */
   publishedAt?: string | null;
+  submittedAt?: string | null;
+  version?: number;
+  pins?: FeedbackPin[];
 }
 
 export type AuditionFeedbackList = AuditionFeedback[];

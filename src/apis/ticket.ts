@@ -1,6 +1,8 @@
 import apiClient from "@/utils/apiClient";
 import { handleApiError } from "@/utils/apiError";
 
+export type TicketType = "BRONZE" | "SILVER";
+
 export interface UserSearchResult {
   userId: number;
   userNickname: string;
@@ -30,13 +32,15 @@ export async function searchUsersByNickname(nickname: string): Promise<UserSearc
 export async function grantTickets(
   nickname: string,
   amount: number,
-  reason?: string
+  reason?: string,
+  ticketType: TicketType = "SILVER"
 ): Promise<TicketGrantResponse> {
   try {
     const res = await apiClient.post("/tickets/grant", {
       nickname,
       amount,
       reason,
+      ticketType,
     });
     return res.data;
   } catch (e) {
@@ -51,6 +55,7 @@ export async function grantTickets(
 export type PaymentPlatform = "IOS" | "ANDROID";
 
 export interface TicketPurchase {
+  ticketType: TicketType;
   logId: number;
   userId: number;
   nickname: string | null;
@@ -79,7 +84,8 @@ export async function getTicketPurchases(
   page: number,
   nickname?: string,
   size = 20,
-  paidOnly = false
+  paidOnly = false,
+  ticketType?: TicketType
 ): Promise<Page<TicketPurchase>> {
   try {
     const res = await apiClient.get("/tickets/purchases", {
@@ -87,6 +93,7 @@ export async function getTicketPurchases(
         page,
         size,
         paidOnly,
+        ...(ticketType ? { ticketType } : {}),
         ...(nickname?.trim() ? { nickname: nickname.trim() } : {}),
       },
     });
@@ -101,6 +108,7 @@ export async function getTicketPurchases(
 
 export type TicketLogType =
   | "USE"
+  | "BOOST_USE"
   | "PURCHASE"
   | "AUDITION_CANCEL"
   | "REFUND"
@@ -108,6 +116,7 @@ export type TicketLogType =
   | "CHALLENGE_REWARD";
 
 export interface TicketLogItem {
+  ticketType: TicketType;
   logId: number;
   type: TicketLogType;
   amount: number;
@@ -118,6 +127,7 @@ export interface TicketLogItem {
 }
 
 export interface UserTicketSummary {
+  ticketType: TicketType;
   userId: number;
   nickname: string | null;
   userName: string | null;
@@ -129,10 +139,11 @@ export interface UserTicketSummary {
 }
 
 export async function getUserTicketSummary(
-  userId: number
+  userId: number,
+  ticketType: TicketType = "SILVER"
 ): Promise<UserTicketSummary | null> {
   try {
-    const res = await apiClient.get(`/tickets/users/${userId}/summary`);
+    const res = await apiClient.get(`/tickets/users/${userId}/summary`, { params: { ticketType } });
     return res.data;
   } catch (e) {
     handleApiError(e);

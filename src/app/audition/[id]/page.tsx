@@ -154,7 +154,7 @@ const AuditionDetailPage: React.FC = () => {
   const handleFinalizeFeedbacks = async () => {
     if (finalizing) return;
     const ok = window.confirm(
-      `'${currentAudition?.title ?? "이"}' 오디션 피드백을 마무리하겠습니다!\n대기 중인 피드백이 모든 지원자에게 공개되고 푸시 알림이 발송됩니다.\n마무리 이후 보내는 피드백은 즉시 전송됩니다.`,
+      `'${currentAudition?.title ?? "이"}' 오디션 피드백을 마무리하겠습니다!\n기본 초안과 작성 완료된 고급 피드백이 공개되고 푸시 알림이 발송됩니다. 미제출 고급 초안은 비공개로 남습니다.\n마무리 이후 기본 피드백은 즉시 전송되고, 고급 피드백은 작성 완료 시 공개됩니다.`,
     );
     if (!ok) return;
     setFinalizing(true);
@@ -162,7 +162,7 @@ const AuditionDetailPage: React.FC = () => {
       const result = await finalizeAuditionFeedbacks(id);
       setLocalFinalizedAt(result.finalizedAt);
       window.alert(
-        `피드백 마무리 완료\n피드백 ${result.publishedCount}건이 공개되고 지원자 ${result.notifiedUserCount}명에게 알림이 발송됐어요.`,
+        `피드백 마무리 완료\n피드백 ${result.publishedCount}건이 공개되고 지원자 ${result.notifiedUserCount}명에게 알림이 발송됐어요.${result.pendingAdvancedCount ? `\n미제출 고급 초안 ${result.pendingAdvancedCount}건은 비공개로 남아 있어요.` : ""}`,
       );
     } catch (e: any) {
       window.alert(e?.message ?? "피드백 마무리에 실패했어요. 다시 시도해 주세요.");
@@ -503,7 +503,7 @@ const AuditionDetailPage: React.FC = () => {
                     title={`마무리 시각: ${feedbackFinalizedAt}`}
                     onClick={() =>
                       window.alert(
-                        "이미 피드백이 마무리된 오디션입니다.\n추가 피드백은 작성 완료 시 지원자에게 바로 전송됩니다.",
+                        "이미 피드백이 마무리된 오디션입니다.\n기본 피드백은 저장 즉시, 고급 피드백은 작성 완료 시 지원자에게 전송됩니다.",
                       )
                     }
                   >
@@ -538,13 +538,13 @@ const AuditionDetailPage: React.FC = () => {
                 )}
                 <HelpDot placement="bottom">
                   <b style={{ color: "var(--admin-ink)" }}>피드백 마무리하기란?</b>
-                  <br />· 지금까지 저장된 <b>초안 피드백을 모든 지원자에게 일괄 공개</b>하고
+                  <br />· 지금까지 저장된 <b>기본 초안과 작성 완료된 고급 피드백을 일괄 공개</b>하고
                   푸시 알림을 보냅니다.
                   <br />· 마무리 시점 기준으로 <b>지원자 평균</b>(앱 능력치 비교선)이
                   온전하게 계산돼요.
-                  <br />· 마무리 <b>이후</b>에 보내는 피드백은 저장 즉시 지원자에게
+                  <br />· 마무리 <b>이후</b> 기본 피드백은 저장 즉시, 고급은 작성 완료 시 지원자에게
                   전송됩니다.
-                  <br />· 항목 평가를 다시 보내면 추가가 아니라 <b>기존 평가가 수정</b>됩니다.
+                  <br />· 기본 항목 평가를 다시 보내면 추가가 아니라 <b>기존 평가가 수정</b>됩니다.
                 </HelpDot>
               </div>
             </div>

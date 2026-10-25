@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import PageShell, { adminCardStyle, btnPrimary, btnSecondary, inputStyle } from "@/components/admin/PageShell";
 import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
@@ -15,6 +15,7 @@ import {
   TicketLogType,
   TicketPurchase,
   PaymentPlatform,
+  TicketType,
 } from "@/apis/ticket";
 
 const REASON_OPTIONS = [
@@ -25,6 +26,8 @@ const REASON_OPTIONS = [
 ];
 
 const PAGE_SIZE = 20;
+const TICKET_LABELS: Record<TicketType, string> = { BRONZE: "브론즈 티켓", SILVER: "실버 티켓" };
+const TICKET_TYPES: TicketType[] = ["BRONZE", "SILVER"];
 
 // 결제내역 기본 필터. 무료 지급(가입 축하 티켓 등)이 대부분이라 실결제만 보는 게 기본.
 const DEFAULT_PAID_ONLY = true;
@@ -34,7 +37,7 @@ const PAID_FILTERS: { id: boolean; label: string }[] = [
 ];
 
 // 결제내역 테이블 컬럼 (헤더 · 데스크탑 행 공용)
-const PAY_GRID = "2fr 2fr 92px 90px 150px";
+const PAY_GRID = "minmax(150px, 1.5fr) minmax(130px, 1fr) 90px 80px 65px 125px";
 
 const LOG_META: Record<TicketLogType, { label: string; sign: "+" | "-"; color: string }> = {
   PURCHASE: { label: "구매", sign: "+", color: "var(--admin-blue)" },
@@ -42,6 +45,7 @@ const LOG_META: Record<TicketLogType, { label: string; sign: "+" | "-"; color: s
   AUDITION_CANCEL: { label: "오디션 취소 환급", sign: "+", color: "#1f8a52" },
   CHALLENGE_REWARD: { label: "챌린지 보상", sign: "+", color: "#1f8a52" },
   REFUND: { label: "환불", sign: "-", color: "#cc3333" },
+  BOOST_USE: { label: "부스팅 사용", sign: "-", color: "var(--admin-ink-2)" },
   USE: { label: "사용", sign: "-", color: "var(--admin-ink-2)" },
 };
 
@@ -85,6 +89,13 @@ const PayChip: React.FC<{ paid: boolean; platform: PaymentPlatform | null }> = (
   );
 };
 
+const TicketTypeChip: React.FC<{ type: TicketType }> = ({ type }) => (
+  <span style={{ display: "inline-block", width: "fit-content", padding: "3px 8px", borderRadius: 6,
+    fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", background: "var(--admin-bg)", color: "var(--admin-ink-2)" }}>
+    {TICKET_LABELS[type] ?? "종류 미확인"}
+  </span>
+);
+
 const fmtDate = (iso: string) => iso.replace("T", " ").slice(0, 16);
 
 const TicketPage: React.FC = () => {
@@ -97,6 +108,7 @@ const TicketPage: React.FC = () => {
   const [searchNickname, setSearchNickname] = useState("");
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
+  const [ticketType, setTicketType] = useState<TicketType>("SILVER");
   const [amount, setAmount] = useState<number>(1);
   const [reason, setReason] = useState(REASON_OPTIONS[0]);
   const [memo, setMemo] = useState("");
@@ -107,46 +119,67 @@ const TicketPage: React.FC = () => {
 
   // ── 선택 유저 티켓 요약 ───────────────────────────────
   const [summary, setSummary] = useState<UserTicketSummary | null>(null);
+  const [summaryContractError, setSummaryContractError] = useState(false);
+  const [purchaseContractError, setPurchaseContractError] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
   // ── 결제내역 목록 ─────────────────────────────────────
   const [purchaseQuery, setPurchaseQuery] = useState("");
+  const [purchaseTicketType, setPurchaseTicketType] = useState<TicketType | "">("");
+  const [appliedPurchaseQuery, setAppliedPurchaseQuery] = useState("");
+  const [summaryVersion, setSummaryVersion] = useState(0);
+  const summaryRequest = useRef(0);
+  const purchaseRequest = useRef(0);
   const [paidOnly, setPaidOnly] = useState(DEFAULT_PAID_ONLY);
   const [purchases, setPurchases] = useState<TicketPurchase[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [loadingPurchases, setLoadingPurchases] = useState(false);
+  const purchaseView = useRef({ page, query: appliedPurchaseQuery, paidOnly, ticketType: purchaseTicketType });
+  purchaseView.current = { page, query: appliedPurchaseQuery, paidOnly, ticketType: purchaseTicketType };
 
-  const loadSummary = useCallback(async (userId: number) => {
-    setSummaryLoading(true);
-    try {
-      setSummary(await getUserTicketSummary(userId));
-    } finally {
+  useEffect(() => {
+    const request = ++summaryRequest.current;
+    setSummary(null);
+    setSummaryContractError(false);
+    if (!selectedUser) {
       setSummaryLoading(false);
+      return;
     }
-  }, []);
+    setSummaryLoading(true);
+    getUserTicketSummary(selectedUser.userId, ticketType).then((result) => {
+      if (request === summaryRequest.current) {
+        setSummary(result?.ticketType === ticketType ? result : null);
+        setSummaryContractError(!!result && result.ticketType !== ticketType);
+        setSummaryLoading(false);
+      }
+    });
+    return () => { summaryRequest.current++; };
+  }, [selectedUser, ticketType, summaryVersion]);
 
-  useEffect(() => {
-    if (selectedUser) loadSummary(selectedUser.userId);
-    else setSummary(null);
-  }, [selectedUser, loadSummary]);
-
-  const loadPurchases = useCallback(async (nextPage: number, query: string, onlyPaid: boolean) => {
+  const loadPurchases = useCallback(async (nextPage: number, query: string, onlyPaid: boolean, type: TicketType | "") => {
+    const request = ++purchaseRequest.current;
     setLoadingPurchases(true);
+    setPage(nextPage);
+    setAppliedPurchaseQuery(query);
     try {
-      const res = await getTicketPurchases(nextPage, query, PAGE_SIZE, onlyPaid);
-      setPurchases(res.content);
+      const res = await getTicketPurchases(nextPage, query, PAGE_SIZE, onlyPaid, type || undefined);
+      if (request !== purchaseRequest.current) return;
+      const incompatible = !!type && res.content.some((item) => item.ticketType !== type);
+      setPurchaseContractError(incompatible);
+      setPurchases(incompatible ? [] : res.content);
       setPage(res.number);
-      setTotalPages(res.totalPages);
-      setTotalElements(res.totalElements);
+      setTotalPages(incompatible ? 0 : res.totalPages);
+      setTotalElements(incompatible ? 0 : res.totalElements);
     } finally {
-      setLoadingPurchases(false);
+      if (request === purchaseRequest.current) setLoadingPurchases(false);
     }
   }, []);
 
   useEffect(() => {
-    loadPurchases(0, "", DEFAULT_PAID_ONLY);
+    loadPurchases(0, "", DEFAULT_PAID_ONLY, "");
+    return () => { purchaseRequest.current++; };
   }, [loadPurchases]);
 
   const handleSearch = async () => {
@@ -169,8 +202,8 @@ const TicketPage: React.FC = () => {
 
   const handleGrant = async () => {
     if (!selectedUser) return;
-    if (amount <= 0) {
-      setError("지급 수량은 1장 이상이어야 합니다.");
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      setError("지급 수량은 1 이상의 정수로 입력해 주세요.");
       return;
     }
     setGranting(true);
@@ -178,13 +211,14 @@ const TicketPage: React.FC = () => {
     setSuccess("");
     try {
       const finalReason = memo.trim() ? `${reason} — ${memo.trim()}` : reason;
-      const res = await grantTickets(selectedUser.userNickname, amount, finalReason);
-      setSuccess(res.message);
+      const res = await grantTickets(selectedUser.userNickname, amount, finalReason, ticketType);
+      setSuccess(`${TICKET_LABELS[ticketType]} ${amount}장 지급 완료 · ${res.message}`);
       setAmount(1);
       setMemo("");
       // 지급 후 요약·결제내역 갱신
-      loadSummary(selectedUser.userId);
-      loadPurchases(page, purchaseQuery, paidOnly);
+      setSummaryVersion((version) => version + 1);
+      const currentView = purchaseView.current;
+      loadPurchases(currentView.page, currentView.query, currentView.paidOnly, currentView.ticketType);
     } catch {
       setError("티켓 지급에 실패했습니다.");
     } finally {
@@ -212,7 +246,7 @@ const TicketPage: React.FC = () => {
         >
           {[
             { key: "grant" as const, label: "티켓 지급" },
-            { key: "pay" as const, label: "결제내역", count: totalElements },
+            { key: "pay" as const, label: "결제내역", count: purchaseContractError ? undefined : totalElements },
           ].map((t) => {
             const on = tab === t.key;
             return (
@@ -247,7 +281,7 @@ const TicketPage: React.FC = () => {
         </div>
 
         {tab === "grant" && (
-        <div className="zg-split" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <div className="zg-split" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 14 }}>
           {/* 지급 */}
           <div style={{ ...adminCardStyle, padding: 22 }}>
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>티켓 지급</div>
@@ -257,13 +291,13 @@ const TicketPage: React.FC = () => {
                 <input
                   value={searchNickname}
                   onChange={(e) => setSearchNickname(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  onKeyDown={(e) => e.key === "Enter" && !granting && handleSearch()}
                   placeholder="@닉네임"
                   style={inputStyle}
                 />
                 <button
                   onClick={handleSearch}
-                  disabled={searching}
+                  disabled={searching || granting}
                   style={{ ...btnSecondary, height: 40, whiteSpace: "nowrap" }}
                 >
                   {searching ? "검색…" : "검색"}
@@ -281,6 +315,7 @@ const TicketPage: React.FC = () => {
                   {searchResults.map((u, i) => (
                     <button
                       key={u.userId}
+                      disabled={granting}
                       onClick={() => {
                         setSelectedUser(u);
                         setSearchResults([]);
@@ -325,17 +360,26 @@ const TicketPage: React.FC = () => {
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{selectedUser.userNickname}</div>
                     <div style={{ fontSize: 11, color: "var(--admin-ink-3)" }}>ID #{selectedUser.userId}</div>
                   </div>
-                  <button onClick={() => setSelectedUser(null)} style={{ fontSize: 12, color: "var(--admin-ink-2)" }}>
+                  <button disabled={granting} onClick={() => setSelectedUser(null)} style={{ fontSize: 12, color: "var(--admin-ink-2)" }}>
                     × 해제
                   </button>
                 </div>
               )}
             </Field>
 
+            <Field label="지급할 티켓 종류">
+              <select aria-label="지급할 티켓 종류" value={ticketType} disabled={granting}
+                onChange={(e) => { setTicketType(e.target.value as TicketType); setError(""); setSuccess(""); }}
+                style={inputStyle}>
+                {TICKET_TYPES.map((type) => <option key={type} value={type}>{TICKET_LABELS[type]}</option>)}
+              </select>
+            </Field>
+
             <Field label="지급 매수">
               <input
                 type="number"
                 min={1}
+                step={1}
                 value={amount}
                 onChange={(e) => setAmount(Number(e.target.value))}
                 style={inputStyle}
@@ -377,7 +421,7 @@ const TicketPage: React.FC = () => {
                   cursor: !selectedUser || granting ? "not-allowed" : "pointer",
                 }}
               >
-                {granting ? "지급 중…" : "티켓 지급"}
+                {granting ? "지급 중…" : `${TICKET_LABELS[ticketType]} 지급`}
               </button>
             </div>
           </div>
@@ -385,9 +429,9 @@ const TicketPage: React.FC = () => {
           {/* 선택 유저 티켓 현황 */}
           <div style={{ ...adminCardStyle, padding: 0, display: "flex", flexDirection: "column" }}>
             <div style={{ padding: "18px 22px", borderBottom: "1px solid var(--admin-border)" }}>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>유저 티켓 현황</div>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>{TICKET_LABELS[ticketType]} 현황</div>
               <div style={{ fontSize: 12, color: "var(--admin-ink-3)", marginTop: 4 }}>
-                {selectedUser ? `${selectedUser.userNickname} 님의 보유·구매·사용 내역` : "지급할 유저를 선택하면 표시됩니다."}
+                {selectedUser ? `${selectedUser.userNickname} 님의 ${TICKET_LABELS[ticketType]} 보유·구매·사용 내역` : "지급할 유저를 선택하면 표시됩니다."}
               </div>
             </div>
 
@@ -396,7 +440,7 @@ const TicketPage: React.FC = () => {
             ) : summaryLoading ? (
               <Empty>불러오는 중…</Empty>
             ) : !summary ? (
-              <Empty>현황을 불러오지 못했습니다.</Empty>
+              <Empty>{summaryContractError ? "서버 업데이트 후 티켓 종류별 현황을 확인할 수 있습니다." : "현황을 불러오지 못했습니다."}</Empty>
             ) : (
               <>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1, background: "var(--admin-border)" }}>
@@ -463,9 +507,18 @@ const TicketPage: React.FC = () => {
             <div style={{ flex: 1, minWidth: 180 }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>티켓 결제내역</div>
               <div style={{ fontSize: 12, color: "var(--admin-ink-3)", marginTop: 4 }}>
-                {paidOnly ? "실결제(인앱 구매)만" : "무료 지급 포함 전체"} · 총 {totalElements.toLocaleString()}건
+                {purchaseTicketType ? TICKET_LABELS[purchaseTicketType] : "전체 티켓"} · {paidOnly ? "실결제(인앱 구매)만" : "무료 지급 포함 전체"}{!purchaseContractError && ` · 총 ${totalElements.toLocaleString()}건`}
               </div>
             </div>
+            <select aria-label="결제내역 티켓 종류" value={purchaseTicketType}
+              onChange={(e) => {
+                const type = e.target.value as TicketType | "";
+                setPurchaseTicketType(type);
+                loadPurchases(0, appliedPurchaseQuery, paidOnly, type);
+              }} style={{ ...inputStyle, width: "auto", minWidth: 140 }}>
+              <option value="">전체 티켓</option>
+              {TICKET_TYPES.map((type) => <option key={type} value={type}>{TICKET_LABELS[type]}</option>)}
+            </select>
             {/* 실결제만 / 전체 (비용 관리의 전체·수익·지출 토글과 같은 규격) */}
             <div
               style={{
@@ -484,7 +537,7 @@ const TicketPage: React.FC = () => {
                     onClick={() => {
                       if (active) return;
                       setPaidOnly(f.id);
-                      loadPurchases(0, purchaseQuery, f.id);
+                      loadPurchases(0, appliedPurchaseQuery, f.id, purchaseTicketType);
                     }}
                     disabled={loadingPurchases}
                     style={{
@@ -508,12 +561,12 @@ const TicketPage: React.FC = () => {
               <input
                 value={purchaseQuery}
                 onChange={(e) => setPurchaseQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && loadPurchases(0, purchaseQuery, paidOnly)}
+                onKeyDown={(e) => e.key === "Enter" && loadPurchases(0, purchaseQuery, paidOnly, purchaseTicketType)}
                 placeholder="닉네임 검색"
                 style={{ ...inputStyle, width: 200 }}
               />
               <button
-                onClick={() => loadPurchases(0, purchaseQuery, paidOnly)}
+                onClick={() => loadPurchases(0, purchaseQuery, paidOnly, purchaseTicketType)}
                 disabled={loadingPurchases}
                 style={{ ...btnSecondary, height: 40, whiteSpace: "nowrap" }}
               >
@@ -522,12 +575,14 @@ const TicketPage: React.FC = () => {
             </div>
           </div>
 
+          <div style={{ overflowX: "auto" }}>
           {/* header */}
           <div
             className="zg-pay-head"
             style={{
               display: "grid",
               gridTemplateColumns: PAY_GRID,
+              minWidth: 740,
               gap: 10,
               padding: "10px 22px",
               fontSize: 11,
@@ -538,7 +593,8 @@ const TicketPage: React.FC = () => {
           >
             <span>유저</span>
             <span>상품</span>
-            <span>구분</span>
+            <span>티켓 종류</span>
+            <span>결제 구분</span>
             <span style={{ textAlign: "right" }}>구매 매수</span>
             <span style={{ textAlign: "right" }}>결제일시</span>
           </div>
@@ -546,7 +602,7 @@ const TicketPage: React.FC = () => {
           {loadingPurchases ? (
             <Empty>불러오는 중…</Empty>
           ) : purchases.length === 0 ? (
-            <Empty>결제내역이 없습니다.</Empty>
+            <Empty>{purchaseContractError ? "서버 업데이트 후 티켓 종류별 결제내역을 확인할 수 있습니다." : "결제내역이 없습니다."}</Empty>
           ) : (
             purchases.map((p, i) => (
               <React.Fragment key={p.logId}>
@@ -556,6 +612,7 @@ const TicketPage: React.FC = () => {
                   style={{
                     display: "grid",
                     gridTemplateColumns: PAY_GRID,
+                    minWidth: 740,
                     gap: 10,
                     padding: "12px 22px",
                     borderTop: i ? "1px solid var(--admin-border)" : "none",
@@ -566,11 +623,12 @@ const TicketPage: React.FC = () => {
                   <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                     <UserAvatar url={p.profileImageUrl} size={28} />
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600 }}>{p.nickname ?? "-"}</div>
+                      <div style={{ fontWeight: 600, overflowWrap: "anywhere" }}>{p.nickname ?? "-"}</div>
                       {p.userName && <div style={{ fontSize: 11, color: "var(--admin-ink-3)" }}>{p.userName}</div>}
                     </div>
                   </div>
-                  <span style={{ color: "var(--admin-ink-2)" }}>{p.productName}</span>
+                  <span style={{ color: "var(--admin-ink-2)", overflowWrap: "anywhere" }}>{p.productName}</span>
+                  <TicketTypeChip type={p.ticketType} />
                   <span>
                     <PayChip paid={p.paid} platform={p.platform} />
                   </span>
@@ -598,6 +656,7 @@ const TicketPage: React.FC = () => {
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{p.nickname ?? "-"}</div>
                     {p.userName && <div style={{ fontSize: 11, color: "var(--admin-ink-3)", marginTop: 1 }}>{p.userName}</div>}
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+                      <TicketTypeChip type={p.ticketType} />
                       <PayChip paid={p.paid} platform={p.platform} />
                       <span style={{ fontSize: 11, color: "var(--admin-ink-3)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {p.productName}
@@ -615,13 +674,14 @@ const TicketPage: React.FC = () => {
             ))
           )}
 
+          </div>
           {/* pagination */}
           {totalPages > 1 && (
             <Pagination
               page={page}
               totalPages={totalPages}
               loading={loadingPurchases}
-              onGo={(p) => loadPurchases(p, purchaseQuery, paidOnly)}
+              onGo={(p) => loadPurchases(p, appliedPurchaseQuery, paidOnly, purchaseTicketType)}
             />
           )}
         </div>

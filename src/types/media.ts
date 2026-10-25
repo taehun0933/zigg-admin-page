@@ -4,6 +4,8 @@ export interface MediaImageType {
 }
 
 export interface MediaVideoType {
+  videoId?: number | null;
+  thumbnailUrl?: string | null;
   videoUrl: string;
   videoDuration: string;
 }

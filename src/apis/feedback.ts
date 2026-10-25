@@ -1,4 +1,4 @@
-import { AuditionFeedbackList } from "@/types/audition";
+import { AuditionFeedback, FeedbackPin, AuditionFeedbackList } from "@/types/audition";
 import apiClient from "@/utils/apiClient";
 import { handleApiError } from "@/utils/apiError";
 
@@ -61,6 +61,7 @@ export interface FinalizeAuditionFeedbacksResult {
   publishedCount: number;
   notifiedUserCount: number;
   finalizedAt: string;
+  pendingAdvancedCount?: number;
 }
 
 export const finalizeAuditionFeedbacks = async (
@@ -108,3 +109,33 @@ export const updateAuditionFeedback = async (body: {
     throw handleApiError(error);
   }
 };
+
+export interface AdvancedFeedbackBody {
+  textReview: string;
+  itemScores: { feedbackItemId: number; score: number }[];
+  pins: FeedbackPin[];
+  version?: number;
+}
+
+export async function saveAdvancedFeedback(auditionId: number, applicationId: number, body: AdvancedFeedbackBody, feedbackId?: number): Promise<AuditionFeedback> {
+  try {
+    const path = `/auditions/${auditionId}/applications/${applicationId}/feedbacks`;
+    const res = feedbackId === undefined
+      ? await apiClient.post<AuditionFeedback>(path, body)
+      : await apiClient.patch<AuditionFeedback>(`${path}/${feedbackId}`, body);
+    return res.data;
+  } catch (error) { throw handleApiError(error); }
+}
+
+export async function submitAdvancedFeedback(auditionId: number, applicationId: number, feedbackId: number, version: number): Promise<AuditionFeedback> {
+  try {
+    const res = await apiClient.post<AuditionFeedback>(`/auditions/${auditionId}/applications/${applicationId}/feedbacks/${feedbackId}/submit`, { version });
+    return res.data;
+  } catch (error) { throw handleApiError(error); }
+}
+
+export async function deleteAdvancedFeedback(auditionId: number, applicationId: number, feedbackId: number, version: number): Promise<void> {
+  try {
+    await apiClient.delete(`/auditions/${auditionId}/applications/${applicationId}/feedbacks/${feedbackId}`, { params: { version } });
+  } catch (error) { throw handleApiError(error); }
+}

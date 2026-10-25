@@ -18,6 +18,7 @@ import { countryNameKo } from "@/utils/countryName";
 import { cdnImage, cdnImgError } from "@/utils/cdnImage";
 import AdminIcon from "@/components/admin/AdminIcon";
 import HelpDot from "@/components/admin/HelpDot";
+import AdvancedAuditionFeedback from "@/components/AdvancedAuditionFeedback";
 
 interface Props {
   applicant: AuditionProfileType | null;
@@ -212,20 +213,23 @@ const ApplicantDetailModal: React.FC<Props> = ({
   const [ratingScores, setRatingScores] = useState<Record<number, number>>({});
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const activeApplicant = useRef(applicant?.id);
+  activeApplicant.current = applicant?.id;
 
   const refreshFeedbacks = useCallback(async () => {
     if (!applicant) return;
     setLoadingFeedbacks(true);
     try {
       const data = await getAuditionFeedbacks(applicant.auditionId, applicant.id);
+      if (activeApplicant.current !== applicant.id) return;
       const list = Array.isArray(data) ? data : [];
       setFeedbacks(list);
       // 목록 카드의 "피드백 완료/대기" 뱃지를 즉시 반영
       onFeedbackChange?.(applicant.id, list.length > 0);
     } catch (e: any) {
-      setError(e?.message ?? "피드백 목록을 불러오지 못했어요.");
+      if (activeApplicant.current === applicant.id) setError(e?.message ?? "피드백 목록을 불러오지 못했어요.");
     } finally {
-      setLoadingFeedbacks(false);
+      if (activeApplicant.current === applicant.id) setLoadingFeedbacks(false);
     }
   }, [applicant, onFeedbackChange]);
 
@@ -234,9 +238,9 @@ const ApplicantDetailModal: React.FC<Props> = ({
     if (!applicant) return;
     try {
       const data = await getApplicantFeedbackHistory(applicant.auditionId, applicant.id);
-      setHistory(Array.isArray(data) ? data : []);
+      if (activeApplicant.current === applicant.id) setHistory(Array.isArray(data) ? data : []);
     } catch {
-      setHistory([]);
+      if (activeApplicant.current === applicant.id) setHistory([]);
     }
   }, [applicant]);
 
@@ -250,6 +254,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
     setEditingId(null);
     setEditingText("");
     setHistory([]);
+    setFeedbacks([]);
     setViewerIdx(null);
     refreshFeedbacks();
     refreshHistory();
@@ -1023,10 +1028,15 @@ const ApplicantDetailModal: React.FC<Props> = ({
             title="피드백"
             action={
               <span style={{ fontSize: 12, color: "var(--admin-ink-3)" }}>
-                {feedbacks.length}건
+                {a.feedbackType === "ADVANCED" ? "고급 피드백" : `${feedbacks.length}건`}
               </span>
             }
           >
+            {a.feedbackType === "ADVANCED" ? (
+              <AdvancedAuditionFeedback key={`${a.auditionId}-${a.id}`} applicant={a} finalized={feedbackFinalized} onChange={onFeedbackChange} />
+            ) : a.feedbackType === "NONE" || (a.feedbackType === undefined && !a.acceptFeedback) ? (
+              <p style={{ color: "var(--admin-ink-2)" }}>피드백을 신청하지 않은 지원자입니다.</p>
+            ) : <>
             {/* Send box */}
             <div
               data-feedback-composer
@@ -1636,6 +1646,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
                 })}
               </div>
             )}
+            </> }
           </Section>
 
           {/* 이전 오디션에서 받은 피드백 */}

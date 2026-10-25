@@ -7,6 +7,7 @@ import AdminIcon from "./AdminIcon";
 import ServerToggle from "./ServerToggle";
 import { useUnansweredInquiryCount } from "./useUnansweredInquiryCount";
 import { usePendingTrainerCount } from "./usePendingTrainerCount";
+import { usePendingLectureCount } from "./usePendingLectureCount";
 import { useIsMobile } from "./useIsMobile";
 import { getStoredRole, homePathOf } from "./useAdminAuthGuard";
 
@@ -60,6 +61,7 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
   // 뱃지용 관리자 API 는 트레이너에게 403 이라 호출하지 않음
   const unansweredCount = useUnansweredInquiryCount(!isTrainer);
   const trainerPendingCount = usePendingTrainerCount(!isTrainer);
+  const lecturePendingCount = usePendingLectureCount(!isTrainer);
 
   // 로그인한 실제 계정 정보 (JWT 클레임에서 role/email 추출)
   const [account, setAccount] = useState<{ email: string; role: string }>({
@@ -269,9 +271,11 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
                 ? unansweredCount
                 : item.id === "trainers"
                 ? trainerPendingCount
+                : item.id === "lectures"
+                ? lecturePendingCount
                 : 0;
             const badgeTitle =
-              item.id === "trainers" ? `승인 대기 ${badgeCount}건` : `미응답 ${badgeCount}건`;
+              item.id === "voices" ? `미응답 ${badgeCount}건` : `승인 대기 ${badgeCount}건`;
             return (
               <button
                 key={item.id}

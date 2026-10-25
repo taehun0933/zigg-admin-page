@@ -14,15 +14,17 @@ import {
 } from "@/components/admin/LectureParts";
 import { Lecture, getLectures } from "@/apis/lecture";
 
-// 관리자 — 클래스 관리 (상단 탭: 클래스 신청 관리 | 클래스 관리)
+// 관리자 — 클래스 관리 (상단 탭: 클래스 관리 | 클래스 신청 관리) + 트레이너별 필터
 type Tab = "REQUESTS" | "LECTURES";
+const ALL_TRAINERS = "ALL";
 
 const ClassPage: React.FC = () => {
   const ready = useAdminAuthGuard();
   const router = useRouter();
   const [data, setData] = useState<Lecture[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>("REQUESTS");
+  const [tab, setTab] = useState<Tab>("LECTURES");
+  const [trainer, setTrainer] = useState<string>(ALL_TRAINERS); // trainerId
   const [openId, setOpenId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -41,14 +43,29 @@ const ClassPage: React.FC = () => {
     if (ready) load();
   }, [ready, load]);
 
-  const requests = useMemo(() => data.filter((l) => l.status === "PENDING"), [data]);
+  // 트레이너 목록 (클래스 수 많은 순)
+  const trainers = useMemo(() => {
+    const byId = new Map<number, { id: number; label: string; count: number }>();
+    data.forEach((l) => {
+      const t = byId.get(l.trainerId) ?? { id: l.trainerId, label: l.trainerEmail ?? `트레이너 #${l.trainerId}`, count: 0 };
+      t.count += 1;
+      byId.set(l.trainerId, t);
+    });
+    return Array.from(byId.values()).sort((a, b) => b.count - a.count);
+  }, [data]);
+  const filtered = useMemo(
+    () => (trainer === ALL_TRAINERS ? data : data.filter((l) => String(l.trainerId) === trainer)),
+    [data, trainer]
+  );
+
+  const requests = useMemo(() => filtered.filter((l) => l.status === "PENDING"), [filtered]);
   // 운영 중 → 마감 순
   const lectures = useMemo(
     () =>
-      data
+      filtered
         .filter((l) => l.status === "APPROVED" || l.status === "CLOSED")
         .sort((a, b) => (a.status === b.status ? 0 : a.status === "APPROVED" ? -1 : 1)),
-    [data]
+    [filtered]
   );
   const list = tab === "REQUESTS" ? requests : lectures;
   const open = data.find((l) => l.lectureId === openId) ?? null;
@@ -71,15 +88,37 @@ const ClassPage: React.FC = () => {
           )
         }
       >
-        <div style={{ marginBottom: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
           <SegmentTabs<Tab>
             tabs={[
-              { id: "REQUESTS", label: "클래스 신청 관리", count: requests.length },
               { id: "LECTURES", label: "클래스 관리", count: lectures.length },
+              { id: "REQUESTS", label: "클래스 신청 관리", count: requests.length },
             ]}
             value={tab}
             onChange={setTab}
           />
+          <select
+            value={trainer}
+            onChange={(e) => setTrainer(e.target.value)}
+            aria-label="트레이너별 보기"
+            style={{
+              height: 36,
+              padding: "0 10px",
+              borderRadius: 9,
+              border: "1px solid var(--admin-border)",
+              background: "#fff",
+              fontSize: 13,
+              color: "var(--admin-ink-2)",
+              maxWidth: "100%",
+            }}
+          >
+            <option value={ALL_TRAINERS}>전체 트레이너 ({data.length})</option>
+            {trainers.map((t) => (
+              <option key={t.id} value={String(t.id)}>
+                {t.label} ({t.count})
+              </option>
+            ))}
+          </select>
         </div>
 
         {loading ? (

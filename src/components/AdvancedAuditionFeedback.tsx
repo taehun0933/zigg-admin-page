@@ -150,7 +150,17 @@ export default function AdvancedAuditionFeedback({ applicant, finalized, onChang
         </>}
         <div className={styles.draftActions}>
           <div className={styles.draftExplanation}><b>작성 완료를 누르면 저장하고 제출합니다.</b><span>{editing?.publishedAt ? "이미 공개된 피드백입니다. 작성 완료를 누르면 수정한 내용이 지원자에게 바로 반영됩니다." : finalized ? "이 오디션은 피드백이 마무리되어, 작성 완료 즉시 지원자에게 공개되고 알림이 발송됩니다." : "제출한 피드백은 오디션 피드백 마무리 시 지원자에게 공개됩니다."}</span>{completionIssue && <span>{completionIssue}</span>}</div>
-          <div style={row}>{(editing || ready === "uncertain-create") && <button type="button" style={button} onClick={() => { if (ready !== "uncertain-create" || window.confirm("저장 결과를 확인했나요? 작성 중인 내용을 비우고 새 작성을 시작합니다.")) reset(); }}>{editing ? "수정 취소" : "작성 취소"}</button>}<button type="button" className={styles.registerDraft} disabled={busy || !!completionIssue} onClick={complete}>{busy ? "완료 중…" : "작성 완료"}</button></div>
+          <div style={row}>{(editing || ready === "uncertain-create") && <button type="button" style={button} onClick={() => { if (ready !== "uncertain-create" || window.confirm("저장 결과를 확인했나요? 작성 중인 내용을 비우고 새 작성을 시작합니다.")) reset(); }}>{editing ? "수정 취소" : "작성 취소"}</button>}<button type="button" className={styles.registerDraft} disabled={busy || ready === "uncertain-create"} onClick={event => {
+            if (!text.trim()) {
+              window.alert("종합 평가 작성해주세요");
+              const review = event.currentTarget.closest("fieldset")?.querySelector<HTMLTextAreaElement>('textarea[aria-label="고급 피드백 종합평"]');
+              review?.focus();
+              review?.scrollIntoView({ behavior: "smooth", block: "center" });
+              return;
+            }
+            if (completionIssue) { window.alert(completionIssue); return; }
+            void complete();
+          }}>{busy ? "완료 중…" : "작성 완료"}</button></div>
         </div>
       </fieldset>
       {feedbacks.length === 0 && <p>저장된 고급 피드백이 없어요.</p>}

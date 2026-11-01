@@ -38,8 +38,16 @@ export default function FeedbackRatingRadar({ scores, expectedCount }: Props) {
           <ResponsiveContainer width="100%" height={280}>
             <RadarChart data={axes} outerRadius="60%" margin={{ top: 20, right: 28, bottom: 20, left: 28 }}>
               <PolarGrid stroke="var(--admin-border)" />
-              <PolarAngleAxis dataKey="name" tick={{ fill: "var(--admin-ink-2)", fontSize: 11 }} />
-              <PolarRadiusAxis domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} tick={{ fill: "var(--admin-ink-3)", fontSize: 10 }} axisLine={false} />
+              <PolarAngleAxis dataKey="name" tickSize={24} tick={({ x, y, textAnchor, index, payload }) => {
+                const axis = axes[index];
+                // Keep the whole two-line label outside the maximum-score vertex.
+                const labelY = Number(y) - (Math.sin(payload.coordinate * Math.PI / 180) > 0.7 ? 14 : 0);
+                return <text x={x} y={labelY} textAnchor={textAnchor} fontSize={11} fill="var(--admin-ink-2)">
+                  <tspan x={x} dy="-0.2em">{axis.name}</tspan>
+                  <tspan x={x} dy="1.3em" fill="var(--admin-blue)" fontWeight={600}>{axis.score === null ? "미평가" : `${axis.score}점`}</tspan>
+                </text>;
+              }} />
+              <PolarRadiusAxis domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} tick={({ x, y, payload }) => <text x={x} y={Number(y) - 4} textAnchor="middle" fill="var(--admin-ink-3)" fontSize={10}>{payload.value}</text>} axisLine={false} />
               <Radar
                 name="평가 점수"
                 dataKey="score"
@@ -59,7 +67,9 @@ export default function FeedbackRatingRadar({ scores, expectedCount }: Props) {
         </p>
       )}
       {axes.length > 0 && (
-        <ul aria-label="항목별 평가 점수" style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: 0, margin: "8px 0 0", listStyle: "none" }}>
+        <ul aria-label="항목별 평가 점수" style={showChart
+          ? { position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clipPath: "inset(50%)", whiteSpace: "nowrap" }
+          : { display: "flex", gap: 6, flexWrap: "wrap", padding: 0, margin: "8px 0 0", listStyle: "none" }}>
           {axes.map(score => (
             <li key={score.feedbackItemId} style={{ padding: "4px 8px", border: "1px solid var(--admin-border)", borderRadius: 8, color: "var(--admin-ink-2)" }}>
               {score.name} <b style={{ color: "var(--admin-blue)" }}>{score.score === null ? "미평가" : `${score.score}점`}</b>

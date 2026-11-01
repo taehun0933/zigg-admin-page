@@ -1,0 +1,211 @@
+.workspaceContainer {
+  display: flow-root;
+  min-width: 0;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.videoPane {
+  min-width: 0;
+}
+
+.video {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  border-radius: 8px;
+  background: var(--admin-bg);
+}
+
+.timelinePane {
+  min-width: 0;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.timelineHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.timelineHeading span {
+  color: var(--admin-ink-3);
+  font-size: 11px;
+}
+
+.timelineList {
+  min-height: 90px;
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.empty {
+  margin: 0;
+  padding: 16px 10px;
+  color: var(--admin-ink-3);
+  line-height: 1.6;
+}
+
+.timelineEntry {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 24px;
+  align-items: start;
+  gap: 6px;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.timelineEntry:last-child {
+  border-bottom: 0;
+}
+
+.timestamp,
+.deletePin {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: auto;
+  min-width: 0;
+  min-height: 28px;
+  margin: 0;
+  border: 0;
+  border-radius: 5px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.timestamp {
+  padding: 4px;
+  background: var(--admin-blue-tint);
+  color: var(--admin-blue);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.deletePin {
+  width: 24px;
+  padding: 6px 4px;
+  background: transparent;
+}
+
+.pinMessage {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--admin-ink);
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.pinMessage:focus {
+  border-color: var(--admin-blue);
+  outline: none;
+  background: var(--admin-bg);
+}
+
+.pinComposer {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--admin-border);
+  background: var(--admin-bg);
+}
+
+.timeControls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.timeControls button {
+  width: auto;
+}
+
+.savedTimeline {
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+}
+
+.savedEntry {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 10px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.savedEntry:last-child {
+  border-bottom: 0;
+}
+
+.savedMessage {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
+
+.draftActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 16px 0 2px;
+  border-top: 1px solid var(--admin-border);
+}
+
+.draftExplanation {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 240px;
+  line-height: 1.6;
+}
+
+.draftExplanation span {
+  color: var(--admin-ink-2);
+  font-size: 12px;
+}
+
+.registerDraft {
+  width: auto;
+  min-width: 132px;
+  min-height: 44px;
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: 1px solid var(--admin-blue);
+  background: var(--admin-blue);
+  color: var(--admin-card);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.registerDraft:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

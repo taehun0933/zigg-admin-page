@@ -19,6 +19,7 @@ import { cdnImage, cdnImgError } from "@/utils/cdnImage";
 import AdminIcon from "@/components/admin/AdminIcon";
 import HelpDot from "@/components/admin/HelpDot";
 import AdvancedAuditionFeedback from "@/components/AdvancedAuditionFeedback";
+import FeedbackHistoryDetails from "@/components/FeedbackHistoryDetails";
 
 interface Props {
   applicant: AuditionProfileType | null;
@@ -1660,7 +1661,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
               }
             >
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {history.map((fb: any, idx: number) => (
+                {history.map((fb, idx) => (
                   <div
                     key={fb.id ?? idx}
                     style={{
@@ -1748,6 +1749,7 @@ const ApplicantDetailModal: React.FC<Props> = ({
                     >
                       {fb.textReview}
                     </p>
+                    <FeedbackHistoryDetails feedback={fb} />
                   </div>
                 ))}
               </div>

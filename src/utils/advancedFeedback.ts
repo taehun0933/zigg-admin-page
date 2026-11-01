@@ -32,3 +32,34 @@ export function feedbackSecondsToMs(value: string): number | null {
   const ms = Math.round(Number(value) * 1000);
   return Number.isSafeInteger(ms) ? ms : null;
 }
+
+/** Composer time uses minutes:seconds; API payloads remain integer milliseconds. */
+export function feedbackTimestampToMs(value: string): number | null {
+  const match = /^([0-9]+):([0-5][0-9])$/.exec(value.trim());
+  if (!match) return null;
+  const ms = (Number(match[1]) * 60 + Number(match[2])) * 1000;
+  return Number.isSafeInteger(ms) ? ms : null;
+}
+
+export function formatFeedbackTimestamp(ms: number): string {
+  return `${Math.floor(ms / 60000)}:${String(Math.floor(ms % 60000 / 1000)).padStart(2, "0")}`;
+}
+
+/** Preserve source indexes so editing sorted/filtered timeline rows updates the right pin. */
+export function chronologicalFeedbackPins(pins: FeedbackPin[], videoId?: number): { pin: FeedbackPin; index: number }[] {
+  return pins.map((pin, index) => ({ pin, index }))
+    .filter(({ pin }) => videoId === undefined || pin.videoId === videoId)
+    .sort((a, b) => a.pin.positionMs - b.pin.positionMs || a.index - b.index);
+}
+
+/** New pins use insertion order; persisted pins use their generated IDs, regardless of API time sorting. */
+export function newestFeedbackPins(pins: FeedbackPin[], videoId?: number): { pin: FeedbackPin; index: number }[] {
+  return pins.map((pin, index) => ({ pin, index }))
+    .filter(({ pin }) => videoId === undefined || pin.videoId === videoId)
+    .sort((a, b) => {
+      if (a.pin.id == null && b.pin.id == null) return b.index - a.index;
+      if (a.pin.id == null) return -1;
+      if (b.pin.id == null) return 1;
+      return b.pin.id - a.pin.id || b.index - a.index;
+    });
+}

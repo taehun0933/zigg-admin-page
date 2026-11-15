@@ -35,6 +35,11 @@ const NAV: NavItem[] = [
   { id: "assets", label: "자산관리", icon: "document", path: "/asset" },
 ];
 
+// 사이드바 하단 고정 메뉴 (관리자 전용)
+const SYSTEM_NAV: NavItem[] = [
+  { id: "monitoring", label: "시스템 모니터링", icon: "gear", path: "/monitoring" },
+];
+
 // 트레이너 로그인 시 메뉴 (관리자 메뉴는 노출하지 않음)
 const TRAINER_NAV: NavItem[] = [
   { id: "myLectures", label: "내 클래스", icon: "video", path: "/my-class" },
@@ -58,6 +63,7 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
   const [role] = useState(getStoredRole);
   const isTrainer = role === "TRAINER";
   const nav = isTrainer ? TRAINER_NAV : NAV;
+  const systemNav = isTrainer ? [] : SYSTEM_NAV;
   // 뱃지용 관리자 API 는 트레이너에게 403 이라 호출하지 않음
   const unansweredCount = useUnansweredInquiryCount(!isTrainer);
   const trainerPendingCount = usePendingTrainerCount(!isTrainer);
@@ -136,11 +142,128 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
   };
 
   const current =
-    nav.find((n) => pathname === n.path || pathname.startsWith(n.path + "/")) ?? nav[0];
+    [...nav, ...systemNav].find(
+      (n) => pathname === n.path || pathname.startsWith(n.path + "/")
+    ) ?? nav[0];
 
   // 모바일에서는 드로어로 동작하므로 항상 펼친(레이블 보이는) 상태로 렌더
   const sidebarCollapsed = collapsed && !isMobile;
   const w = collapsed ? "var(--admin-sidebar-collapsed)" : "var(--admin-sidebar-w)";
+
+  const renderNavItem = (item: NavItem) => {
+    const active = item.id === current.id;
+    const badgeCount =
+      item.id === "voices"
+        ? unansweredCount
+        : item.id === "trainers"
+        ? trainerPendingCount
+        : item.id === "lectures"
+        ? lecturePendingCount
+        : 0;
+    const badgeTitle =
+      item.id === "voices" ? `미응답 ${badgeCount}건` : `승인 대기 ${badgeCount}건`;
+    return (
+      <button
+        key={item.id}
+        onClick={() => router.push(item.path)}
+        title={sidebarCollapsed ? item.label : ""}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: sidebarCollapsed ? "12px 0" : "11px 12px",
+          borderRadius: 10,
+          justifyContent: sidebarCollapsed ? "center" : "flex-start",
+          background: active ? "var(--admin-blue-tint)" : "transparent",
+          color: active ? "var(--admin-blue)" : "var(--admin-ink)",
+          fontWeight: active ? 600 : 500,
+          fontSize: 14,
+          position: "relative",
+          transition: "background .15s",
+        }}
+        onMouseEnter={(e) => {
+          if (!active) e.currentTarget.style.background = "#f4f5f8";
+        }}
+        onMouseLeave={(e) => {
+          if (!active) e.currentTarget.style.background = "transparent";
+        }}
+      >
+        {active && !sidebarCollapsed && (
+          <span
+            style={{
+              position: "absolute",
+              left: -10,
+              top: 8,
+              bottom: 8,
+              width: 3,
+              borderRadius: 4,
+              background: "var(--admin-blue)",
+            }}
+          />
+        )}
+        <span style={{ position: "relative", display: "grid", placeItems: "center" }}>
+          <AdminIcon
+            name={active && item.activeIcon ? item.activeIcon : item.icon}
+            size={20}
+            opacity={active ? 1 : 0.7}
+          />
+          {badgeCount > 0 && sidebarCollapsed && (
+            <span
+              title={badgeTitle}
+              style={{
+                position: "absolute",
+                top: -3,
+                right: -4,
+                minWidth: 14,
+                height: 14,
+                padding: "0 4px",
+                borderRadius: 999,
+                background: "#ff453a",
+                color: "#fff",
+                fontSize: 9,
+                fontWeight: 700,
+                display: "grid",
+                placeItems: "center",
+                border: "1.5px solid #fff",
+                fontVariantNumeric: "tabular-nums",
+                lineHeight: 1,
+              }}
+            >
+              {badgeCount > 99 ? "99+" : badgeCount}
+            </span>
+          )}
+        </span>
+        {!sidebarCollapsed && (
+          <>
+            <span>{item.label}</span>
+            {badgeCount > 0 && (
+              <span
+                title={badgeTitle}
+                style={{
+                  marginLeft: "auto",
+                  minWidth: 20,
+                  height: 18,
+                  padding: "0 6px",
+                  borderRadius: 999,
+                  background: "#ff453a",
+                  color: "#fff",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontVariantNumeric: "tabular-nums",
+                  lineHeight: 1,
+                }}
+              >
+                {badgeCount > 99 ? "99+" : badgeCount}
+              </span>
+            )}
+          </>
+        )}
+      </button>
+    );
+  };
 
   return (
     <div
@@ -264,121 +387,23 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
               운영 메뉴
             </div>
           )}
-          {nav.map((item) => {
-            const active = item.id === current.id;
-            const badgeCount =
-              item.id === "voices"
-                ? unansweredCount
-                : item.id === "trainers"
-                ? trainerPendingCount
-                : item.id === "lectures"
-                ? lecturePendingCount
-                : 0;
-            const badgeTitle =
-              item.id === "voices" ? `미응답 ${badgeCount}건` : `승인 대기 ${badgeCount}건`;
-            return (
-              <button
-                key={item.id}
-                onClick={() => router.push(item.path)}
-                title={sidebarCollapsed ? item.label : ""}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: sidebarCollapsed ? "12px 0" : "11px 12px",
-                  borderRadius: 10,
-                  justifyContent: sidebarCollapsed ? "center" : "flex-start",
-                  background: active ? "var(--admin-blue-tint)" : "transparent",
-                  color: active ? "var(--admin-blue)" : "var(--admin-ink)",
-                  fontWeight: active ? 600 : 500,
-                  fontSize: 14,
-                  position: "relative",
-                  transition: "background .15s",
-                }}
-                onMouseEnter={(e) => {
-                  if (!active) e.currentTarget.style.background = "#f4f5f8";
-                }}
-                onMouseLeave={(e) => {
-                  if (!active) e.currentTarget.style.background = "transparent";
-                }}
-              >
-                {active && !sidebarCollapsed && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      left: -10,
-                      top: 8,
-                      bottom: 8,
-                      width: 3,
-                      borderRadius: 4,
-                      background: "var(--admin-blue)",
-                    }}
-                  />
-                )}
-                <span style={{ position: "relative", display: "grid", placeItems: "center" }}>
-                  <AdminIcon
-                    name={active && item.activeIcon ? item.activeIcon : item.icon}
-                    size={20}
-                    opacity={active ? 1 : 0.7}
-                  />
-                  {badgeCount > 0 && sidebarCollapsed && (
-                    <span
-                      title={badgeTitle}
-                      style={{
-                        position: "absolute",
-                        top: -3,
-                        right: -4,
-                        minWidth: 14,
-                        height: 14,
-                        padding: "0 4px",
-                        borderRadius: 999,
-                        background: "#ff453a",
-                        color: "#fff",
-                        fontSize: 9,
-                        fontWeight: 700,
-                        display: "grid",
-                        placeItems: "center",
-                        border: "1.5px solid #fff",
-                        fontVariantNumeric: "tabular-nums",
-                        lineHeight: 1,
-                      }}
-                    >
-                      {badgeCount > 99 ? "99+" : badgeCount}
-                    </span>
-                  )}
-                </span>
-                {!sidebarCollapsed && (
-                  <>
-                    <span>{item.label}</span>
-                    {badgeCount > 0 && (
-                      <span
-                        title={badgeTitle}
-                        style={{
-                          marginLeft: "auto",
-                          minWidth: 20,
-                          height: 18,
-                          padding: "0 6px",
-                          borderRadius: 999,
-                          background: "#ff453a",
-                          color: "#fff",
-                          fontSize: 11,
-                          fontWeight: 700,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontVariantNumeric: "tabular-nums",
-                          lineHeight: 1,
-                        }}
-                      >
-                        {badgeCount > 99 ? "99+" : badgeCount}
-                      </span>
-                    )}
-                  </>
-                )}
-              </button>
-            );
-          })}
+          {nav.map(renderNavItem)}
         </nav>
+
+        {/* 하단 고정 메뉴 (시스템) */}
+        {systemNav.length > 0 && (
+          <div
+            style={{
+              borderTop: "1px solid var(--admin-border)",
+              padding: "10px 10px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+            }}
+          >
+            {systemNav.map(renderNavItem)}
+          </div>
+        )}
 
         {/* Footer (user info only — logout moved to topbar) */}
         {!sidebarCollapsed && (

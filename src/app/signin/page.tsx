@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { authService } from "@/apis/login";
 import ServerToggle from "@/components/admin/ServerToggle";
 import { getStoredRole, homePathOf } from "@/components/admin/useAdminAuthGuard";
+import { getAppleIdToken, startKakaoLogin } from "@/utils/socialLogin";
+import { errorMessageOf, nextPathAfterOAuth } from "@/utils/oauthRouting";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -14,6 +16,53 @@ export default function SignInPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const [socialBusy, setSocialBusy] = useState(false);
+
+  // 카카오 콜백·소셜 로그인 결과 안내 (?oauth=pending / ?oauthError=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("oauth") === "pending") {
+      setPending("현재 승인 중입니다. 관리자 승인 후 로그인할 수 있어요.");
+    }
+    const oauthError = params.get("oauthError");
+    if (oauthError) setError(oauthError);
+  }, []);
+
+  const handleKakao = () => {
+    setError(null);
+    setPending(null);
+    try {
+      setSocialBusy(true);
+      startKakaoLogin();
+    } catch (err) {
+      setSocialBusy(false);
+      setError(errorMessageOf(err, "카카오 로그인에 실패했어요."));
+    }
+  };
+
+  const handleApple = async () => {
+    setError(null);
+    setPending(null);
+    setSocialBusy(true);
+    try {
+      const idToken = await getAppleIdToken();
+      if (!idToken) return; // 팝업 닫음
+      const result = await authService.oauthLogin({ platform: "APPLE", idToken });
+      const next = nextPathAfterOAuth(result);
+      if (next.loggedIn) {
+        setIsLoggedIn(true);
+        router.push(next.path);
+      } else if (result.trainerStatus === "PENDING") {
+        setPending("현재 승인 중입니다. 관리자 승인 후 로그인할 수 있어요.");
+      } else {
+        router.push(next.path);
+      }
+    } catch (err) {
+      setError(errorMessageOf(err, "Apple 로그인에 실패했어요."));
+    } finally {
+      setSocialBusy(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -140,7 +189,7 @@ export default function SignInPage() {
               ZIGG 관리자 페이지
             </h1>
             <p style={{ fontSize: 13, color: "var(--admin-ink-2)", margin: "6px 0 0" }}>
-              트레이너 또는 관리자 이메일·비밀번호로 로그인하세요.
+              ZIGG 앱 계정(카카오·Apple) 또는 이메일·비밀번호로 로그인하세요.
             </p>
           </div>
 
@@ -237,6 +286,43 @@ export default function SignInPage() {
             </button>
           </form>
 
+          {/* 소셜 로그인 — ZIGG 앱과 같은 계정 */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              margin: "20px 0 14px",
+              fontSize: 11.5,
+              color: "var(--admin-ink-3)",
+              fontWeight: 600,
+            }}
+          >
+            <span style={{ flex: 1, height: 1, background: "var(--admin-border)" }} />
+            ZIGG 앱 계정으로 로그인
+            <span style={{ flex: 1, height: 1, background: "var(--admin-border)" }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <button
+              type="button"
+              onClick={handleKakao}
+              disabled={socialBusy}
+              style={socialBtn("#FEE500", "rgba(0,0,0,.85)", socialBusy)}
+            >
+              <KakaoSymbol />
+              카카오로 로그인
+            </button>
+            <button
+              type="button"
+              onClick={handleApple}
+              disabled={socialBusy}
+              style={socialBtn("#000", "#fff", socialBusy)}
+            >
+              <AppleSymbol />
+              Apple로 로그인
+            </button>
+          </div>
+
           <div
             style={{
               marginTop: 16,
@@ -259,7 +345,7 @@ export default function SignInPage() {
                 cursor: "pointer",
               }}
             >
-              트레이너 발급 신청하기 ›
+              이메일로 트레이너 신청하기 ›
             </button>
           </div>
 
@@ -271,7 +357,7 @@ export default function SignInPage() {
               lineHeight: 1.5,
             }}
           >
-            트레이너 계정은 관리자 승인 후 로그인할 수 있어요. 상단 우측 토글로 Dev / Prod 서버를 전환할 수 있습니다.
+            ZIGG 앱 계정으로 로그인하면 같은 계정 그대로 트레이너 전환을 신청할 수 있어요. 트레이너 권한은 관리자 승인 후 열려요. 상단 우측 토글로 Dev / Prod 서버를 전환할 수 있습니다.
           </div>
         </div>
       </main>
@@ -297,3 +383,38 @@ const inputStyle: React.CSSProperties = {
   outline: "none",
   color: "var(--admin-ink)",
 };
+
+const socialBtn = (bg: string, color: string, disabled: boolean): React.CSSProperties => ({
+  height: 44,
+  borderRadius: 10,
+  background: bg,
+  color,
+  fontWeight: 700,
+  fontSize: 14,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  cursor: disabled ? "not-allowed" : "pointer",
+  opacity: disabled ? 0.6 : 1,
+  transition: "opacity .15s",
+});
+
+const KakaoSymbol = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+    <path
+      fill="#000"
+      d="M12 3C6.48 3 2 6.48 2 10.77c0 2.77 1.86 5.2 4.66 6.57-.2.75-.74 2.72-.85 3.14-.13.52.19.51.4.37.17-.11 2.66-1.8 3.74-2.53.66.1 1.34.15 2.05.15 5.52 0 10-3.48 10-7.7C22 6.48 17.52 3 12 3z"
+    />
+  </svg>
+);
+
+const AppleSymbol = () => (
+  <svg width="16" height="18" viewBox="0 0 384 470" aria-hidden>
+    <path
+      fill="#fff"
+      d="M318.7 251.2c-.6-56.7 46.3-84 48.4-85.3-26.4-38.6-67.4-43.9-82-44.5-34.9-3.5-68.1 20.6-85.8 20.6-17.7 0-45-20.1-74-19.5-38 .6-73.1 22.1-92.7 56.2-39.5 68.5-10.1 170 28.4 225.6 18.8 27.2 41.2 57.8 70.6 56.7 28.4-1.1 39.1-18.4 73.4-18.4s43.9 18.4 74 17.8c30.5-.6 49.9-27.8 68.6-55.1 21.6-31.6 30.5-62.2 31-63.8-.7-.3-59.4-22.8-59.9-90.3zM262.4 85.1c15.6-19 26.2-45.3 23.3-71.6-22.6.9-50 15.1-66.2 34-14.5 16.8-27.3 43.6-23.9 69.4 25.2 2 50.9-12.8 66.8-31.8z"
+    />
+  </svg>
+);
+

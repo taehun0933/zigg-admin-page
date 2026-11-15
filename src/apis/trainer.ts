@@ -3,6 +3,7 @@ import { handleApiError } from "@/utils/apiError";
 import { getApiBaseUrl } from "@/utils/apiConfig";
 import { getFileExtension, getImageDimensions } from "@/utils/media";
 import axios from "axios";
+import { TRAINER_APPLY_TOKEN_KEY } from "@/apis/login";
 
 // 백엔드 trainer 모듈 응답 (TrainerApplicationResponseDto)
 export type TrainerApplicationStatus = "PENDING" | "APPROVED" | "REJECTED";
@@ -55,6 +56,28 @@ export async function applyTrainer(
     const { data } = await axios.post<TrainerApplication>(
       `${getApiBaseUrl()}/trainer/apply`,
       req
+    );
+    return data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+}
+
+/* ===== 소셜 로그인 유저 — 기존 ZIGG 계정으로 강사 전환 신청 ===== */
+
+// /admin/v0 → 서버 루트 (/api/v1 호출용)
+const apiRootUrl = () => getApiBaseUrl().replace(/\/admin\/v0\/?$/, "");
+
+export async function applyTrainerAsUser(
+  profileImageIds: number[]
+): Promise<TrainerApplication> {
+  const token = sessionStorage.getItem(TRAINER_APPLY_TOKEN_KEY);
+  if (!token) throw new Error("로그인 정보가 만료됐어요. 다시 로그인해주세요.");
+  try {
+    const { data } = await axios.post<TrainerApplication>(
+      `${apiRootUrl()}/api/v1/trainer-applications`,
+      { profileImageIds },
+      { headers: { Authorization: token } }
     );
     return data;
   } catch (error) {

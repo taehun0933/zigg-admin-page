@@ -1,13 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ServerToggle from "@/components/admin/ServerToggle";
 import AdminIcon from "@/components/admin/AdminIcon";
 import {
   applyTrainer,
+  applyTrainerAsUser,
   uploadTrainerProfileImage,
 } from "@/apis/trainer";
+import { errorMessageOf } from "@/utils/oauthRouting";
 
 // 백엔드(trainer 모듈) 미배포 환경에서도 신청 흐름을 확인할 수 있게 하는 데모 폴백.
 // dev/prod 에 배포되면 false 로 바꾸세요.
@@ -29,6 +31,15 @@ export default function TrainerApplyPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 카카오·Apple 로그인 후 진입(?social=1) — 이메일·비밀번호 없이 기존 ZIGG 계정으로 전환 신청
+  const [social, setSocial] = useState(false);
+  const [rejectedReason, setRejectedReason] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("social") === "1") setSocial(true);
+    if (params.get("rejected") === "1") setRejectedReason(params.get("reason") ?? "");
+  }, []);
 
   const pickPhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -43,7 +54,9 @@ export default function TrainerApplyPage() {
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const pwMismatch = pw2.length > 0 && pw !== pw2;
-  const canSubmit = emailValid && pw.length >= 8 && pw === pw2 && !submitting;
+  const canSubmit = social
+    ? !submitting
+    : emailValid && pw.length >= 8 && pw === pw2 && !submitting;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,12 +68,16 @@ export default function TrainerApplyPage() {
       for (const p of photos) {
         profileImageIds.push(await uploadTrainerProfileImage(p.file));
       }
-      await applyTrainer({
-        email,
-        password: pw,
-        passwordConfirm: pw2,
-        profileImageIds,
-      });
+      if (social) {
+        await applyTrainerAsUser(profileImageIds);
+      } else {
+        await applyTrainer({
+          email,
+          password: pw,
+          passwordConfirm: pw2,
+          profileImageIds,
+        });
+      }
       setStage("pending");
     } catch (err) {
       if (DEMO_FALLBACK) {
@@ -68,9 +85,7 @@ export default function TrainerApplyPage() {
         console.warn("[trainer-apply] API 미연결, 데모 폴백:", err);
         setStage("pending");
       } else {
-        const msg =
-          err instanceof Error ? err.message : "신청에 실패했습니다.";
-        setError(msg);
+        setError(errorMessageOf(err, "신청에 실패했습니다."));
       }
     } finally {
       setSubmitting(false);
@@ -83,20 +98,47 @@ export default function TrainerApplyPage() {
         {stage === "pending" ? (
           <TrainerStatus
             tone="pending"
+            sub={
+              social
+                ? "관리자 승인 후 같은 카카오·Apple 계정으로 로그인하면 트레이너 화면이 열려요."
+                : undefined
+            }
             onBack={() => router.push("/signin")}
             backLabel="로그인 화면으로"
           />
         ) : (
           <>
             <CardHeader
-              eyebrow="트레이너 발급 신청"
+              eyebrow={social ? "트레이너 전환 신청" : "트레이너 발급 신청"}
               title="트레이너로 활동하기"
-              sub="로그인에 사용할 이메일과 비밀번호를 등록하면 관리자 승인 후 활동을 시작할 수 있어요."
+              sub={
+                social
+                  ? "지금 로그인한 ZIGG 앱 계정 그대로 트레이너로 전환돼요. 관리자 승인 후 활동을 시작할 수 있어요."
+                  : "로그인에 사용할 이메일과 비밀번호를 등록하면 관리자 승인 후 활동을 시작할 수 있어요."
+              }
             />
+            {rejectedReason !== null && (
+              <div
+                style={{
+                  marginBottom: 14,
+                  padding: "10px 12px",
+                  background: "#ffeaea",
+                  color: "#cc3333",
+                  border: "1px solid #f9d3d3",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                }}
+              >
+                이전 신청이 반려되었어요.{rejectedReason ? ` 사유: ${rejectedReason}` : ""} 보완 후 다시 신청해주세요.
+              </div>
+            )}
             <form
               onSubmit={submit}
               style={{ display: "flex", flexDirection: "column", gap: 14 }}
             >
+              {!social && (
+                <>
               <Field label="이메일 (로그인 아이디)">
                 <input
                   type="email"
@@ -149,6 +191,9 @@ export default function TrainerApplyPage() {
                   </div>
                 )}
               </div>
+
+                </>
+              )}
 
               {/* 프로필 사진 (선택, 0~5장) */}
               <div
@@ -276,10 +321,12 @@ export default function TrainerApplyPage() {
 /* ── 승인 대기/결과 상태 ── */
 function TrainerStatus({
   tone = "pending",
+  sub,
   onBack,
   backLabel,
 }: {
   tone?: "pending" | "approved" | "rejected";
+  sub?: string;
   onBack: () => void;
   backLabel?: string;
 }) {
@@ -348,7 +395,7 @@ function TrainerStatus({
           maxWidth: 300,
         }}
       >
-        {cfg.sub}
+        {sub ?? cfg.sub}
       </p>
       {tone === "pending" && (
         <div

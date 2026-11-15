@@ -396,7 +396,7 @@ const AuditionPage: React.FC = () => {
                   })
                 }
               />
-              상시 피드백 오디션 (마감일 없음, 지원 시 티켓 1장 차감)
+              상시 피드백 오디션 (마감일 없음, 기본 피드백 1장 · 고급 피드백 2장 차감)
             </label>
             <div style={{ display: "flex", gap: 12 }}>
               <Field label="시작일" style={{ flex: 1 }}>

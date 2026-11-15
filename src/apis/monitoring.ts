@@ -66,3 +66,64 @@ export async function getResourceMonitoring(
   });
   return res.data;
 }
+
+/* ───────────── 앱 에러 로그 (client_error_log) ───────────── */
+
+export interface ClientErrorLog {
+  id: number;
+  userId: number | null;
+  userNickname: string | null;
+  context: string; // reel_upload, post_upload, space_video_upload ...
+  step: string; // s3_put_video, VIDEO_CONTENT_FAILED ...
+  errorMessage: string;
+  errorCode: string | null;
+  httpStatus: number | null;
+  platform: string | null;
+  appVersion: string | null;
+  extra: string | null; // JSON 문자열
+  createdAt: string; // UTC LocalDateTime ("Z" 없음)
+}
+
+export interface ClientErrorContextCount {
+  context: string;
+  count: number;
+}
+
+export interface SpringPage<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+}
+
+export const CLIENT_ERROR_CONTEXT_LABEL: Record<string, string> = {
+  reel_upload: "릴스 업로드",
+  post_upload: "게시글 업로드",
+  space_video_upload: "스페이스 영상",
+  chat_video_upload: "채팅 영상",
+  inquiry_video_upload: "문의 영상",
+  audition_video_upload: "오디션 영상",
+  s3_upload: "기타 업로드",
+  ticket_payment: "티켓 결제",
+};
+
+export async function getClientErrors(params: {
+  context?: string;
+  platform?: string;
+  days: number;
+  page: number;
+  size?: number;
+}): Promise<SpringPage<ClientErrorLog>> {
+  const res = await apiClient.get<SpringPage<ClientErrorLog>>("/client-errors", {
+    params: { size: 30, ...params },
+  });
+  return res.data;
+}
+
+export async function getClientErrorSummary(days: number): Promise<ClientErrorContextCount[]> {
+  const res = await apiClient.get<ClientErrorContextCount[]>("/client-errors/summary", {
+    params: { days },
+  });
+  return res.data;
+}

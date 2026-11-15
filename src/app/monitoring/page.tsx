@@ -14,8 +14,14 @@ import AdminShell from "@/components/admin/AdminShell";
 import PageShell, { adminCardStyle, btnSecondary } from "@/components/admin/PageShell";
 import { useAdminAuthGuard } from "@/components/admin/useAdminAuthGuard";
 import { useIsMobile } from "@/components/admin/useIsMobile";
+import { Pagination } from "@mui/material";
 import {
+  CLIENT_ERROR_CONTEXT_LABEL,
+  ClientErrorContextCount,
+  ClientErrorLog,
   ENV_LABEL,
+  getClientErrors,
+  getClientErrorSummary,
   getResourceMonitoring,
   MetricPanel,
   MonitoringEnv,
@@ -23,6 +29,7 @@ import {
   MonitoringUnit,
   RANGE_LABEL,
   ResourceMonitoring,
+  SpringPage,
 } from "@/apis/monitoring";
 import { handleApiError } from "@/utils/apiError";
 
@@ -339,9 +346,252 @@ function ResourcesTab() {
   );
 }
 
-/* ───────────────────────── 로그 탭 (구성만 — 수집 연동 후 API 연결) ───────────────────────── */
+/* ───────────────────────── 로그 탭 ───────────────────────── */
 
-function LogsTab() {
+type LogSection = "appErrors" | "server";
+const LOG_SECTIONS: LogSection[] = ["appErrors", "server"];
+const LOG_SECTION_LABEL: Record<LogSection, string> = { appErrors: "앱 에러", server: "서버 로그" };
+
+const ERROR_DAYS = ["1", "7", "30"] as const;
+type ErrorDays = (typeof ERROR_DAYS)[number];
+const PLATFORMS = ["", "ios", "android"] as const;
+type PlatformFilter = (typeof PLATFORMS)[number];
+
+const contextLabel = (c: string) => CLIENT_ERROR_CONTEXT_LABEL[c] ?? c;
+
+// 서버는 UTC LocalDateTime 을 준다 → "Z" 붙여 로컬(KST)로 표시
+const formatServerTime = (s: string) => {
+  const d = new Date(/[zZ]|[+-]\d\d:\d\d$/.test(s) ? s : s + "Z");
+  if (isNaN(d.getTime())) return s;
+  return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
+const prettyJson = (raw: string | null) => {
+  if (!raw) return null;
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
+};
+
+function AppErrorsPanel() {
+  const isMobile = useIsMobile();
+  const [days, setDays] = useState<ErrorDays>("7");
+  const [context, setContext] = useState<string>("");
+  const [platform, setPlatform] = useState<PlatformFilter>("");
+  const [page, setPage] = useState(0);
+  const [summary, setSummary] = useState<ClientErrorContextCount[]>([]);
+  const [data, setData] = useState<SpringPage<ClientErrorLog> | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [list, counts] = await Promise.all([
+        getClientErrors({ context: context || undefined, platform: platform || undefined, days: Number(days), page }),
+        getClientErrorSummary(Number(days)),
+      ]);
+      setData(list);
+      setSummary(counts);
+    } catch (e) {
+      setData(null);
+      setError(handleApiError(e).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [context, platform, days, page]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // 필터가 바뀌면 첫 페이지부터
+  const changeFilter = <T,>(setter: (v: T) => void) => (v: T) => {
+    setPage(0);
+    setOpenId(null);
+    setter(v);
+  };
+
+  const total = summary.reduce((sum, c) => sum + c.count, 0);
+  const contextOptions = ["", ...summary.map((c) => c.context)];
+  if (context && !contextOptions.includes(context)) contextOptions.push(context);
+  const countOf = (c: string) => (c ? summary.find((s) => s.context === c)?.count ?? 0 : total);
+
+  return (
+    <>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+        <Chips
+          options={[...ERROR_DAYS]}
+          value={days}
+          label={(d) => (d === "1" ? "24시간" : `${d}일`)}
+          onChange={changeFilter(setDays)}
+        />
+        <Chips
+          options={[...PLATFORMS]}
+          value={platform}
+          label={(p) => (p === "" ? "전체 OS" : p === "ios" ? "iOS" : "Android")}
+          onChange={changeFilter(setPlatform)}
+        />
+        <div style={{ flex: 1 }} />
+        <button style={btnSecondary} onClick={load} disabled={loading}>
+          {loading ? "불러오는 중…" : "새로고침"}
+        </button>
+      </div>
+
+      {/* context(어느 화면) 필터 — 건수 포함 */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+        {contextOptions.map((c) => {
+          const on = c === context;
+          return (
+            <button
+              key={c || "all"}
+              onClick={() => changeFilter(setContext)(c)}
+              style={{
+                height: 30,
+                padding: "0 11px",
+                borderRadius: 999,
+                fontSize: 12.5,
+                fontWeight: 600,
+                border: `1px solid ${on ? "var(--admin-blue)" : "var(--admin-border)"}`,
+                background: on ? "var(--admin-blue-tint)" : "#fff",
+                color: on ? "var(--admin-blue)" : "var(--admin-ink-2)",
+              }}
+            >
+              {c ? contextLabel(c) : "전체"}
+              <span style={{ marginLeft: 5, fontVariantNumeric: "tabular-nums", opacity: 0.8 }}>
+                {countOf(c).toLocaleString()}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ ...adminCardStyle, overflow: "hidden" }}>
+        {error ? (
+          <EmptyBox height={220}>
+            에러 로그를 불러오지 못했습니다.
+            <br />
+            {error}
+          </EmptyBox>
+        ) : !data ? (
+          <EmptyBox height={220}>불러오는 중…</EmptyBox>
+        ) : data.content.length === 0 ? (
+          <EmptyBox height={220}>기간 내 앱 에러가 없습니다</EmptyBox>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 820 }}>
+              <thead>
+                <tr style={{ background: "#fafafb", color: "var(--admin-ink-3)", textAlign: "left" }}>
+                  {["시간", "화면", "단계", "에러", "유저", "OS · 버전", "HTTP"].map((h) => (
+                    <th key={h} style={{ padding: "10px 12px", fontWeight: 600, whiteSpace: "nowrap" }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.content.map((row) => {
+                  const open = openId === row.id;
+                  const extra = prettyJson(row.extra);
+                  return (
+                    <React.Fragment key={row.id}>
+                      <tr
+                        onClick={() => setOpenId(open ? null : row.id)}
+                        style={{
+                          borderTop: "1px solid var(--admin-border)",
+                          cursor: "pointer",
+                          background: open ? "#f7f9ff" : "transparent",
+                        }}
+                      >
+                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: "var(--admin-ink-2)" }}>
+                          {formatServerTime(row.createdAt)}
+                        </td>
+                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap", fontWeight: 600 }}>
+                          {contextLabel(row.context)}
+                        </td>
+                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
+                          <code style={{ fontSize: 11.5, background: "#f0f1f4", padding: "2px 6px", borderRadius: 6 }}>
+                            {row.step}
+                          </code>
+                        </td>
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            maxWidth: isMobile ? 220 : 380,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            color: "var(--admin-red-ink)",
+                          }}
+                          title={row.errorMessage}
+                        >
+                          {row.errorMessage}
+                        </td>
+                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
+                          {row.userId ? `${row.userNickname ?? "-"} (#${row.userId})` : <span style={{ color: "var(--admin-ink-3)" }}>익명</span>}
+                        </td>
+                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap", color: "var(--admin-ink-2)" }}>
+                          {row.platform ?? "-"} · {row.appVersion ?? "-"}
+                        </td>
+                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                          {row.httpStatus ?? "-"}
+                        </td>
+                      </tr>
+                      {open && (
+                        <tr style={{ background: "#f7f9ff" }}>
+                          <td colSpan={7} style={{ padding: "4px 12px 14px" }}>
+                            <pre
+                              style={{
+                                margin: 0,
+                                padding: 12,
+                                borderRadius: 10,
+                                background: "#16161a",
+                                color: "#e4e4e7",
+                                fontSize: 12,
+                                whiteSpace: "pre-wrap",
+                                wordBreak: "break-all",
+                                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                              }}
+                            >
+                              {row.errorMessage}
+                              {row.errorCode ? `\n\nerrorCode: ${row.errorCode}` : ""}
+                              {extra ? `\n\nextra:\n${extra}` : ""}
+                            </pre>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {data && data.totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
+          <Pagination
+            count={data.totalPages}
+            page={page + 1}
+            onChange={(_, p) => {
+              setOpenId(null);
+              setPage(p - 1);
+            }}
+            size={isMobile ? "small" : "medium"}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+// 서버 로그 — CloudWatch 연동(dev 수집 방식 확정) 후 API 연결
+function ServerLogsPanel() {
   const isMobile = useIsMobile();
   const [env, setEnv] = useState<MonitoringEnv>("PROD");
   const [range, setRange] = useState<MonitoringRange>("H24");
@@ -396,6 +646,18 @@ function LogsTab() {
           </div>
         </div>
       </div>
+    </>
+  );
+}
+
+function LogsTab() {
+  const [section, setSection] = useState<LogSection>("appErrors");
+  return (
+    <>
+      <div style={{ marginBottom: 14 }}>
+        <Chips options={LOG_SECTIONS} value={section} label={(v) => LOG_SECTION_LABEL[v]} onChange={setSection} />
+      </div>
+      {section === "appErrors" ? <AppErrorsPanel /> : <ServerLogsPanel />}
     </>
   );
 }

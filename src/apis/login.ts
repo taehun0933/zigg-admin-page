@@ -38,9 +38,17 @@ export const authService = {
         throw new Error("로그인 응답에 토큰이 없습니다.");
       }
 
+      const role = getRoleFromToken(tokenValue);
+      if (role !== "ADMIN" && role !== "TRAINER") {
+        // 관리자·트레이너가 아니면 토큰을 저장하지 않는다
+        throw { status: 403, message: "관리자 페이지 이용 권한이 없는 계정입니다." };
+      }
       localStorage.setItem("token", tokenValue);
-      localStorage.setItem("role", getRoleFromToken(tokenValue));
+      localStorage.setItem("role", role);
     } catch (error) {
+      if ((error as { status?: number })?.status === 403 && !(error as { response?: unknown }).response) {
+        throw error;
+      }
       throw handleApiError(error);
     }
   },

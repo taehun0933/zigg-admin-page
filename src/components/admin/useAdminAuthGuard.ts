@@ -23,11 +23,20 @@ export const homePathOf = (role: AdminRole) =>
  */
 export function useAdminAuthGuard(allow: AdminRole = "ADMIN") {
   const router = useRouter();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, setIsLoggedIn } = useAuth();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn) {
+      router.replace("/signin");
+      return;
+    }
+    // 관리자·트레이너가 아닌 role 이 저장돼 있으면(이전 버전 로그인 등) 로그아웃 처리
+    const rawRole = localStorage.getItem("role");
+    if (rawRole && rawRole !== "ADMIN" && rawRole !== "TRAINER") {
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      setIsLoggedIn(false);
       router.replace("/signin");
       return;
     }
@@ -37,7 +46,7 @@ export function useAdminAuthGuard(allow: AdminRole = "ADMIN") {
       return;
     }
     setReady(true);
-  }, [isLoggedIn, router, allow]);
+  }, [isLoggedIn, setIsLoggedIn, router, allow]);
 
   return ready;
 }

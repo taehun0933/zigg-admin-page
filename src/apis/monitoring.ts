@@ -127,3 +127,43 @@ export async function getClientErrorSummary(days: number): Promise<ClientErrorCo
   });
   return res.data;
 }
+
+/* ───────────── 서버 로그 (CloudWatch, VM 별) ───────────── */
+
+export interface LogInstance {
+  instanceId: string;
+  firstEventAt: number | null; // epoch millis
+  lastEventAt: number | null;
+}
+
+export interface LogInstances {
+  supported: boolean; // false = 수집 미연동(dev)
+  instances: LogInstance[];
+}
+
+export interface LogEvent {
+  timestamp: number; // epoch millis
+  message: string;
+}
+
+export interface LogEvents {
+  events: LogEvent[]; // 시간 오름차순
+  nextToken: string | null; // 검색 없음 = 더 이전 로그, 검색 중 = 다음 결과
+  searching: boolean;
+}
+
+export async function getLogInstances(env: MonitoringEnv, range: MonitoringRange): Promise<LogInstances> {
+  const res = await apiClient.get<LogInstances>("/monitoring/logs/instances", { params: { env, range } });
+  return res.data;
+}
+
+export async function getLogEvents(params: {
+  env: MonitoringEnv;
+  instanceId: string;
+  range: MonitoringRange;
+  query?: string;
+  nextToken?: string;
+}): Promise<LogEvents> {
+  const res = await apiClient.get<LogEvents>("/monitoring/logs", { params });
+  return res.data;
+}

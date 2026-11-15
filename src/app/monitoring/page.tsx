@@ -22,7 +22,11 @@ import {
   ENV_LABEL,
   getClientErrors,
   getClientErrorSummary,
+  getLogEvents,
+  getLogInstances,
   getResourceMonitoring,
+  LogEvents,
+  LogInstances,
   MetricPanel,
   MonitoringEnv,
   MonitoringRange,
@@ -597,11 +601,108 @@ function AppErrorsPanel() {
   );
 }
 
-// 서버 로그 — CloudWatch 연동(dev 수집 방식 확정) 후 API 연결
+// 서버 로그 — VM(EC2 인스턴스) 별 CloudWatch 로그. dev 는 아직 수집 안 함.
+
+// 컨테이너 로그의 ANSI 색 코드·compose 접두어(backend-1 | ) 제거
+const cleanLogLine = (msg: string) =>
+  msg.replace(/\x1b\[[0-9;]*m/g, "").replace(/^[\w.-]+-\d+\s+\|\s?/, "");
+
+const levelColor = (line: string) =>
+  /\bERROR\b|Exception/.test(line) ? "#ff6b63" : /\bWARN\b/.test(line) ? "#ffb340" : "#d4d4d8";
+
+const formatMillis = (ms: number | null, withSec = false) => {
+  if (ms == null) return "-";
+  const d = new Date(ms);
+  const base = `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return withSec ? `${base}:${pad(d.getSeconds())}` : base;
+};
+
 function ServerLogsPanel() {
   const isMobile = useIsMobile();
   const [env, setEnv] = useState<MonitoringEnv>("PROD");
   const [range, setRange] = useState<MonitoringRange>("H24");
+  const [instances, setInstances] = useState<LogInstances | null>(null);
+  const [instanceError, setInstanceError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [queryInput, setQueryInput] = useState("");
+  const [query, setQuery] = useState("");
+  const [logs, setLogs] = useState<LogEvents | null>(null);
+  const [logError, setLogError] = useState<string | null>(null);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  // VM 목록 — env/기간이 바뀌면 다시, 가장 최근 VM 자동 선택
+  useEffect(() => {
+    let cancelled = false;
+    setInstances(null);
+    setInstanceError(null);
+    setLogs(null);
+    getLogInstances(env, range)
+      .then((res) => {
+        if (cancelled) return;
+        setInstances(res);
+        setSelected((cur) =>
+          cur && res.instances.some((i) => i.instanceId === cur) ? cur : res.instances[0]?.instanceId ?? null
+        );
+      })
+      .catch((e) => !cancelled && setInstanceError(errorText(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [env, range]);
+
+  const loadLogs = useCallback(
+    async (nextToken?: string) => {
+      if (!selected) return;
+      setLoadingLogs(true);
+      setLogError(null);
+      try {
+        const res = await getLogEvents({
+          env,
+          instanceId: selected,
+          range,
+          query: query || undefined,
+          nextToken,
+        });
+        setLogs((prev) =>
+          !nextToken || !prev
+            ? res
+            : {
+                ...res,
+                // 검색 없음: 더 이전 로그를 위에, 검색 중: 다음 결과를 아래에
+                events: res.searching ? [...prev.events, ...res.events] : [...res.events, ...prev.events],
+              }
+        );
+      } catch (e) {
+        setLogError(errorText(e));
+      } finally {
+        setLoadingLogs(false);
+      }
+    },
+    [env, selected, range, query]
+  );
+
+  useEffect(() => {
+    setLogs(null);
+    loadLogs();
+  }, [loadLogs]);
+
+  const moreButton = logs?.nextToken ? (
+    <button
+      onClick={() => loadLogs(logs.nextToken ?? undefined)}
+      disabled={loadingLogs}
+      style={{
+        width: "100%",
+        padding: "8px 0",
+        fontSize: 12,
+        color: "#a1a1aa",
+        background: "#1f1f24",
+        borderRadius: 6,
+        margin: "4px 0",
+      }}
+    >
+      {loadingLogs ? "불러오는 중…" : logs.searching ? "다음 검색 결과 더 보기" : "이전 로그 더 보기"}
+    </button>
+  ) : null;
 
   return (
     <>
@@ -609,19 +710,44 @@ function ServerLogsPanel() {
         <Chips options={ENVS} value={env} label={(v) => ENV_LABEL[v]} onChange={setEnv} />
         <Chips options={RANGES} value={range} label={(v) => RANGE_LABEL[v]} onChange={setRange} />
         <div style={{ flex: 1 }} />
-        <input
-          disabled
-          placeholder="로그 검색 (예: ERROR, userId)"
-          style={{
-            height: 38,
-            width: isMobile ? "100%" : 260,
-            padding: "0 12px",
-            borderRadius: 10,
-            border: "1px solid var(--admin-border)",
-            fontSize: 13,
-            background: "#fafafb",
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setQuery(queryInput.trim());
           }}
-        />
+          style={{ display: "flex", gap: 6, width: isMobile ? "100%" : "auto" }}
+        >
+          <input
+            value={queryInput}
+            onChange={(e) => setQueryInput(e.target.value)}
+            placeholder="로그 검색 (예: ERROR, userId=123)"
+            style={{
+              height: 38,
+              flex: 1,
+              width: isMobile ? "auto" : 240,
+              padding: "0 12px",
+              borderRadius: 10,
+              border: "1px solid var(--admin-border)",
+              fontSize: 13,
+              background: "#fff",
+            }}
+          />
+          <button type="submit" style={btnSecondary}>
+            검색
+          </button>
+          {query && (
+            <button
+              type="button"
+              style={btnSecondary}
+              onClick={() => {
+                setQueryInput("");
+                setQuery("");
+              }}
+            >
+              초기화
+            </button>
+          )}
+        </form>
       </div>
 
       <div
@@ -631,25 +757,120 @@ function ServerLogsPanel() {
           gap: 14,
         }}
       >
-        <div style={{ ...adminCardStyle, padding: 14 }}>
+        <div style={{ ...adminCardStyle, padding: 14, alignSelf: "start" }}>
           <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 4 }}>VM 목록</div>
-          <div style={{ fontSize: 12, color: "var(--admin-ink-3)" }}>
-            {RANGE_LABEL[range]} 동안 떠 있던 {env === "PROD" ? "EC2 인스턴스" : "백엔드 컨테이너(배포)"}
+          <div style={{ fontSize: 12, color: "var(--admin-ink-3)", marginBottom: 10 }}>
+            {RANGE_LABEL[range]} 동안 로그를 남긴 {env === "PROD" ? "EC2 인스턴스" : "서버"}
           </div>
-          <EmptyBox height={200}>로그 수집 연동 후 표시됩니다</EmptyBox>
+          {instanceError !== null ? (
+            <EmptyBox height={160}>{instanceError}</EmptyBox>
+          ) : !instances ? (
+            <EmptyBox height={160}>불러오는 중…</EmptyBox>
+          ) : !instances.supported ? (
+            <EmptyBox height={160}>
+              Dev 서버 로그는 아직 수집하지 않습니다
+              <br />
+              (CloudWatch 연동 예정)
+            </EmptyBox>
+          ) : instances.instances.length === 0 ? (
+            <EmptyBox height={160}>기간 내 로그가 없습니다</EmptyBox>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {instances.instances.map((inst, idx) => {
+                const on = inst.instanceId === selected;
+                const live = idx === 0 && inst.lastEventAt != null && Date.now() - inst.lastEventAt < 15 * 60 * 1000;
+                return (
+                  <button
+                    key={inst.instanceId}
+                    onClick={() => setSelected(inst.instanceId)}
+                    title={inst.instanceId}
+                    style={{
+                      textAlign: "left",
+                      padding: "9px 11px",
+                      borderRadius: 10,
+                      border: `1px solid ${on ? "var(--admin-blue)" : "var(--admin-border)"}`,
+                      background: on ? "var(--admin-blue-tint)" : "#fff",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: on ? "var(--admin-blue)" : "var(--admin-ink)" }}>
+                        {shortId(inst.instanceId)}
+                      </span>
+                      <span
+                        style={{
+                          marginLeft: "auto",
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          padding: "2px 7px",
+                          borderRadius: 999,
+                          background: live ? "var(--admin-good-tint)" : "#f0f1f4",
+                          color: live ? "var(--admin-good)" : "var(--admin-ink-3)",
+                        }}
+                      >
+                        {live ? "가동 중" : "종료"}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11.5, color: "var(--admin-ink-3)", marginTop: 3, fontVariantNumeric: "tabular-nums" }}>
+                      {formatMillis(inst.firstEventAt)} ~ {live ? "현재" : formatMillis(inst.lastEventAt)}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
+
         <div style={{ ...adminCardStyle, padding: 14, minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 10 }}>로그</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 13.5, fontWeight: 700 }}>로그</span>
+            {selected && <span style={{ fontSize: 12, color: "var(--admin-ink-3)" }}>{selected}</span>}
+            {query && (
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--admin-blue)", background: "var(--admin-blue-tint)", padding: "2px 8px", borderRadius: 999 }}>
+                검색: {query}
+              </span>
+            )}
+            <div style={{ flex: 1 }} />
+            <button style={{ ...btnSecondary, height: 30, fontSize: 12 }} onClick={() => loadLogs()} disabled={!selected || loadingLogs}>
+              새로고침
+            </button>
+          </div>
           <div
             style={{
               background: "#16161a",
               borderRadius: 10,
-              color: "#a1a1aa",
               fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
               fontSize: 12,
+              lineHeight: 1.55,
+              maxHeight: 620,
+              overflow: "auto",
+              padding: logs && logs.events.length > 0 ? "8px 12px" : 0,
             }}
           >
-            <EmptyBox height={360}>VM 을 선택하면 해당 기간의 로그가 여기에 표시됩니다</EmptyBox>
+            {!selected ? (
+              <EmptyBox height={360}>VM 을 선택하면 해당 기간의 로그가 표시됩니다</EmptyBox>
+            ) : logError !== null ? (
+              <EmptyBox height={360}>{logError}</EmptyBox>
+            ) : !logs ? (
+              <EmptyBox height={360}>불러오는 중…</EmptyBox>
+            ) : logs.events.length === 0 ? (
+              <EmptyBox height={360}>{query ? "검색 결과가 없습니다" : "기간 내 로그가 없습니다"}</EmptyBox>
+            ) : (
+              <>
+                {!logs.searching && moreButton}
+                {logs.events.map((ev, i) => {
+                  const line = cleanLogLine(ev.message);
+                  return (
+                    <div key={`${ev.timestamp}-${i}`} style={{ display: "flex", gap: 10, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                      <span style={{ color: "#6b6b76", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+                        {formatMillis(ev.timestamp, true)}
+                      </span>
+                      <span style={{ color: levelColor(line) }}>{line}</span>
+                    </div>
+                  );
+                })}
+                {logs.searching && moreButton}
+              </>
+            )}
           </div>
         </div>
       </div>

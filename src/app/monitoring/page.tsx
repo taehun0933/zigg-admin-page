@@ -75,6 +75,13 @@ const formatTime = (epochSec: number, withDate: boolean) => {
 
 const shortId = (id: string) => (id.startsWith("i-") ? `${id.slice(0, 6)}…${id.slice(-4)}` : id);
 
+// 404 처럼 본문 없는 에러도 메시지가 비지 않게 (빈 문자열이면 "불러오는 중" 에 갇힌다)
+const errorText = (e: unknown) => {
+  const { message, status } = handleApiError(e);
+  if (status === 404) return "이 서버에는 아직 모니터링 API 가 없습니다. 상단 서버 스위치를 Dev 로 바꿔 보세요.";
+  return message || `요청 실패${status ? ` (${status})` : ""}`;
+};
+
 /* ───────────────────────── 공통 UI ───────────────────────── */
 
 function Chips<T extends string>({
@@ -243,7 +250,7 @@ function ResourcesTab() {
       setData(await getResourceMonitoring(env, range));
     } catch (e) {
       setData(null);
-      setError(handleApiError(e).message);
+      setError(errorText(e));
     } finally {
       setLoading(false);
     }
@@ -317,7 +324,7 @@ function ResourcesTab() {
         </div>
       )}
 
-      {error ? (
+      {error !== null ? (
         <div style={{ ...adminCardStyle }}>
           <EmptyBox height={220}>
             지표를 불러오지 못했습니다.
@@ -399,7 +406,7 @@ function AppErrorsPanel() {
       setSummary(counts);
     } catch (e) {
       setData(null);
-      setError(handleApiError(e).message);
+      setError(errorText(e));
     } finally {
       setLoading(false);
     }
@@ -471,7 +478,7 @@ function AppErrorsPanel() {
       </div>
 
       <div style={{ ...adminCardStyle, overflow: "hidden" }}>
-        {error ? (
+        {error !== null ? (
           <EmptyBox height={220}>
             에러 로그를 불러오지 못했습니다.
             <br />

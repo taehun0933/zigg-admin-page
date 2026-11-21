@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 type Environment = "dev" | "prod";
 type Settings = Record<string, string | undefined>;
 type Fetcher = typeof fetch;
@@ -67,54 +65,16 @@ async function boundedText(body: ReadableStream<Uint8Array> | null, limit: numbe
   return Buffer.concat(chunks).toString("utf8");
 }
 
-async function requireAdmin(
-  request: Request,
-  env: Environment,
-  settings: Settings,
-  fetcher: Fetcher,
-): Promise<string> {
+/** Check only header shape; NanoClaw verifies this token with ZIGG on every operation. */
+function forwardedAuthorization(request: Request): string {
   const token = request.headers.get("authorization") ?? "";
   if (!/^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/i.test(token) || token.length > 8192) {
     throw new ProxyError(401, "관리자 계정으로 다시 로그인해 주세요.");
   }
-  const configured = env === "dev"
-    ? settings.NEXT_PUBLIC_API_URL_DEV ?? "https://dev.achoom-zigg.com/admin/v0"
-    : settings.NEXT_PUBLIC_API_URL_PROD ?? "https://prod.achoom-zigg.com/admin/v0";
-  const base = trustedUrl(configured);
-  base.pathname = `${base.pathname.replace(/\/$/, "")}/stats/overview`;
-  let response: Response;
-  try {
-    // This existing endpoint is @AdminOnly. A decoded JWT alone is never authorization.
-    response = await fetcher(base, {
-      headers: { Authorization: token },
-      cache: "no-store",
-      redirect: "error",
-      signal: AbortSignal.timeout(8_000),
-    });
-  } catch {
-    throw new ProxyError(503, "관리자 권한을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.");
-  }
-  await response.body?.cancel();
-  if (response.status === 401 || response.status === 403) {
-    throw new ProxyError(response.status, "관리자 권한이 필요합니다. 다시 로그인해 주세요.");
-  }
-  if (!response.ok) throw new ProxyError(503, "관리자 권한 확인 서버에 연결할 수 없습니다.");
-
-  try {
-    // The backend has now verified the signature and ADMIN role against its database.
-    const claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
-    if (claims.auth !== "ADMIN" || typeof claims.sub !== "string" || !claims.sub) {
-      throw new Error("Invalid administrator identity");
-    }
-    return createHash("sha256")
-      .update(JSON.stringify([env, claims.provider ?? "", claims.sub, claims.email ?? ""]))
-      .digest("hex");
-  } catch {
-    throw new ProxyError(403, "관리자 계정 정보를 확인할 수 없습니다.");
-  }
+  return token;
 }
 
-/** Server-only boundary. Never forward the user's token or client-supplied identity to NanoClaw. */
+/** Same-origin transport only. Forward the original ZIGG token; never trust caller identity headers. */
 export async function proxyAiJobs(
   request: Request,
   jobId?: string,
@@ -122,6 +82,7 @@ export async function proxyAiJobs(
   fetcher: Fetcher = fetch,
 ): Promise<Response> {
   try {
+    const authorization = forwardedAuthorization(request);
     if (jobId && !UUID.test(jobId)) throw new ProxyError(400, "작업 번호가 올바르지 않습니다.");
     const method = request.method;
     if (method !== "GET" && method !== "POST") throw new ProxyError(405, "지원하지 않는 요청입니다.");
@@ -157,9 +118,7 @@ export async function proxyAiJobs(
       env = environment(new URL(request.url).searchParams.get("environment"));
     }
 
-    const principal = await requireAdmin(request, env, settings, fetcher);
-    const sharedToken = settings.NANOCLAW_ADMIN_API_TOKEN;
-    if (!settings.NANOCLAW_ADMIN_API_URL || !sharedToken || sharedToken.length < 32 || /\s/.test(sharedToken)) {
+    if (!settings.NANOCLAW_ADMIN_API_URL) {
       throw new ProxyError(503, "AI 운영 도우미 서버가 아직 연결되지 않았습니다.");
     }
     const url = trustedUrl(settings.NANOCLAW_ADMIN_API_URL);
@@ -171,9 +130,8 @@ export async function proxyAiJobs(
       upstream = await fetcher(url, {
         method,
         headers: {
-          Authorization: `Bearer ${sharedToken}`,
+          Authorization: authorization,
           "Content-Type": "application/json",
-          "x-zigg-principal": principal,
           "x-zigg-environment": env,
         },
         body: payload ? JSON.stringify(payload) : undefined,
@@ -189,6 +147,8 @@ export async function proxyAiJobs(
       await upstream.body?.cancel();
       const errors: Record<number, string> = {
         400: "질문 또는 대화 정보를 확인해 주세요.",
+        401: "관리자 계정으로 다시 로그인해 주세요.",
+        403: "이 서버의 관리자 권한이 필요합니다.",
         404: "작업을 찾을 수 없습니다.",
         409: "이 대화에서 조사가 진행 중입니다. 완료 후 다시 질문해 주세요.",
         413: "질문이 너무 깁니다.",

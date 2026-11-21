@@ -22,6 +22,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { id: "dashboard", label: "대시보드", icon: "home", activeIcon: "home_activated", path: "/dashboard" },
+  { id: "aiAssistant", label: "AI 운영 도우미", icon: "comment_grey", activeIcon: "comment_accent", path: "/ai-assistant" },
   { id: "auditions", label: "오디션 관리", icon: "star", path: "/audition" },
   { id: "challenges", label: "챌린지 관리", icon: "award", path: "/challenge" },
   { id: "boards", label: "게시판 관리", icon: "community", activeIcon: "community_activated", path: "/board" },

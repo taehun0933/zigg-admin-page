@@ -89,6 +89,11 @@ export interface ClientErrorContextCount {
   count: number;
 }
 
+export interface ClientErrorStepCount {
+  step: string;
+  count: number;
+}
+
 export interface SpringPage<T> {
   content: T[];
   totalElements: number;
@@ -111,6 +116,7 @@ export const CLIENT_ERROR_CONTEXT_LABEL: Record<string, string> = {
 export async function getClientErrors(params: {
   context?: string;
   platform?: string;
+  step?: string;
   days: number;
   page: number;
   size?: number;
@@ -124,6 +130,17 @@ export async function getClientErrors(params: {
 export async function getClientErrorSummary(days: number): Promise<ClientErrorContextCount[]> {
   const res = await apiClient.get<ClientErrorContextCount[]>("/client-errors/summary", {
     params: { days },
+  });
+  return res.data;
+}
+
+/** step(pick, upload, s3_put_video …) 별 건수. context 를 주면 그 화면 안에서만 센다. */
+export async function getClientErrorStepSummary(
+  days: number,
+  context?: string
+): Promise<ClientErrorStepCount[]> {
+  const res = await apiClient.get<ClientErrorStepCount[]>("/client-errors/summary/steps", {
+    params: { days, context },
   });
   return res.data;
 }

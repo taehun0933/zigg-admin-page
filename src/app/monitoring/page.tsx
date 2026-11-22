@@ -18,10 +18,12 @@ import { Pagination } from "@mui/material";
 import {
   CLIENT_ERROR_CONTEXT_LABEL,
   ClientErrorContextCount,
+  ClientErrorStepCount,
   ClientErrorLog,
   ENV_LABEL,
   getClientErrors,
   getClientErrorSummary,
+  getClientErrorStepSummary,
   getLogEvents,
   getLogInstances,
   getResourceMonitoring,
@@ -386,13 +388,49 @@ const prettyJson = (raw: string | null) => {
   }
 };
 
+/** 필터 칩 (라벨 + 건수) — 화면·단계 필터 공용 */
+function CountPill({
+  on,
+  label,
+  count,
+  onClick,
+}: {
+  on: boolean;
+  label: string;
+  count: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        height: 30,
+        padding: "0 11px",
+        borderRadius: 999,
+        fontSize: 12.5,
+        fontWeight: 600,
+        border: `1px solid ${on ? "var(--admin-blue)" : "var(--admin-border)"}`,
+        background: on ? "var(--admin-blue-tint)" : "#fff",
+        color: on ? "var(--admin-blue)" : "var(--admin-ink-2)",
+      }}
+    >
+      {label}
+      <span style={{ marginLeft: 5, fontVariantNumeric: "tabular-nums", opacity: 0.8 }}>
+        {count.toLocaleString()}
+      </span>
+    </button>
+  );
+}
+
 function AppErrorsPanel() {
   const isMobile = useIsMobile();
   const [days, setDays] = useState<ErrorDays>("7");
   const [context, setContext] = useState<string>("");
   const [platform, setPlatform] = useState<PlatformFilter>("");
+  const [step, setStep] = useState<string>("");
   const [page, setPage] = useState(0);
   const [summary, setSummary] = useState<ClientErrorContextCount[]>([]);
+  const [stepSummary, setStepSummary] = useState<ClientErrorStepCount[]>([]);
   const [data, setData] = useState<SpringPage<ClientErrorLog> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -402,19 +440,27 @@ function AppErrorsPanel() {
     setLoading(true);
     setError(null);
     try {
-      const [list, counts] = await Promise.all([
-        getClientErrors({ context: context || undefined, platform: platform || undefined, days: Number(days), page }),
+      const [list, counts, stepCounts] = await Promise.all([
+        getClientErrors({
+          context: context || undefined,
+          platform: platform || undefined,
+          step: step || undefined,
+          days: Number(days),
+          page,
+        }),
         getClientErrorSummary(Number(days)),
+        getClientErrorStepSummary(Number(days), context || undefined),
       ]);
       setData(list);
       setSummary(counts);
+      setStepSummary(stepCounts);
     } catch (e) {
       setData(null);
       setError(errorText(e));
     } finally {
       setLoading(false);
     }
-  }, [context, platform, days, page]);
+  }, [context, platform, step, days, page]);
 
   useEffect(() => {
     load();
@@ -431,6 +477,12 @@ function AppErrorsPanel() {
   const contextOptions = ["", ...summary.map((c) => c.context)];
   if (context && !contextOptions.includes(context)) contextOptions.push(context);
   const countOf = (c: string) => (c ? summary.find((s) => s.context === c)?.count ?? 0 : total);
+
+  const stepTotal = stepSummary.reduce((sum, c) => sum + c.count, 0);
+  const stepOptions = ["", ...stepSummary.map((c) => c.step)];
+  if (step && !stepOptions.includes(step)) stepOptions.push(step);
+  const stepCountOf = (st: string) =>
+    st ? stepSummary.find((s) => s.step === st)?.count ?? 0 : stepTotal;
 
   return (
     <>
@@ -454,31 +506,33 @@ function AppErrorsPanel() {
       </div>
 
       {/* context(어느 화면) 필터 — 건수 포함 */}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-        {contextOptions.map((c) => {
-          const on = c === context;
-          return (
-            <button
-              key={c || "all"}
-              onClick={() => changeFilter(setContext)(c)}
-              style={{
-                height: 30,
-                padding: "0 11px",
-                borderRadius: 999,
-                fontSize: 12.5,
-                fontWeight: 600,
-                border: `1px solid ${on ? "var(--admin-blue)" : "var(--admin-border)"}`,
-                background: on ? "var(--admin-blue-tint)" : "#fff",
-                color: on ? "var(--admin-blue)" : "var(--admin-ink-2)",
-              }}
-            >
-              {c ? contextLabel(c) : "전체"}
-              <span style={{ marginLeft: 5, fontVariantNumeric: "tabular-nums", opacity: 0.8 }}>
-                {countOf(c).toLocaleString()}
-              </span>
-            </button>
-          );
-        })}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+        {contextOptions.map((c) => (
+          <CountPill
+            key={c || "all"}
+            on={c === context}
+            label={c ? contextLabel(c) : "전체"}
+            count={countOf(c)}
+            onClick={() => {
+              setStep("");
+              changeFilter(setContext)(c);
+            }}
+          />
+        ))}
+      </div>
+
+      {/* step(단계) 필터 — 선택한 화면 안에서의 건수 */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
+        <span style={{ fontSize: 12, color: "var(--admin-ink-3)", marginRight: 2 }}>단계</span>
+        {stepOptions.map((st) => (
+          <CountPill
+            key={st || "all"}
+            on={st === step}
+            label={st || "전체"}
+            count={stepCountOf(st)}
+            onClick={() => changeFilter(setStep)(st)}
+          />
+        ))}
       </div>
 
       <div style={{ ...adminCardStyle, overflow: "hidden" }}>

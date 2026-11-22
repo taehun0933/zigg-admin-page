@@ -27,6 +27,7 @@ import {
   getLogEvents,
   getLogInstances,
   getResourceMonitoring,
+  getTraceEvents,
   LogEvents,
   LogInstances,
   MetricPanel,
@@ -36,7 +37,12 @@ import {
   RANGE_LABEL,
   ResourceMonitoring,
   SpringPage,
+  TRACE_TYPE_LABEL,
+  TraceEvent,
+  TraceEvents,
+  TraceType,
 } from "@/apis/monitoring";
+import { AdminUserSearchResult, searchAdminUsers } from "@/apis/user";
 import { handleApiError } from "@/utils/apiError";
 
 type Tab = "resources" | "logs";
@@ -361,9 +367,9 @@ function ResourcesTab() {
 
 /* ───────────────────────── 로그 탭 ───────────────────────── */
 
-type LogSection = "appErrors" | "server";
-const LOG_SECTIONS: LogSection[] = ["appErrors", "server"];
-const LOG_SECTION_LABEL: Record<LogSection, string> = { appErrors: "앱 에러", server: "서버 로그" };
+type LogSection = "appErrors" | "server" | "trace";
+const LOG_SECTIONS: LogSection[] = ["appErrors", "server", "trace"];
+const LOG_SECTION_LABEL: Record<LogSection, string> = { appErrors: "앱 에러", server: "서버 로그", trace: "유저 추적" };
 
 const ERROR_DAYS = ["1", "7", "30"] as const;
 type ErrorDays = (typeof ERROR_DAYS)[number];
@@ -449,7 +455,8 @@ function AppErrorsPanel() {
           page,
         }),
         getClientErrorSummary(Number(days)),
-        getClientErrorStepSummary(Number(days), context || undefined),
+        // 단계 건수 API 가 없는 서버(배포 전 prod)여도 목록은 보여준다
+        getClientErrorStepSummary(Number(days), context || undefined).catch(() => []),
       ]);
       setData(list);
       setSummary(counts);
@@ -932,6 +939,394 @@ function ServerLogsPanel() {
   );
 }
 
+// 유저 추적 — 로그 줄의 uid / aid / rid 로 CloudWatch 검색 (모든 VM).
+// 유저 → 행동(actionId: 오디션 지원·결제처럼 여러 API 묶음) → 요청(requestId: API 1번) 순서로 파고든다.
+
+const TRACE_TYPES: TraceType[] = ["USER", "ACTION", "REQUEST"];
+
+const shortTraceId = (id: string) => (id.length > 12 ? `${id.slice(0, 8)}…` : id);
+
+const statusColor = (status: number) =>
+  status >= 500
+    ? { color: "var(--admin-red-ink)", background: "var(--admin-red-tint)" }
+    : status >= 400
+      ? { color: "var(--admin-warn)", background: "var(--admin-warn-tint)" }
+      : { color: "var(--admin-good)", background: "var(--admin-good-tint)" };
+
+function StatusBadge({ status }: { status: number }) {
+  return (
+    <span
+      style={{
+        ...statusColor(status),
+        fontSize: 11,
+        fontWeight: 700,
+        padding: "2px 7px",
+        borderRadius: 999,
+        fontVariantNumeric: "tabular-nums",
+        flexShrink: 0,
+      }}
+    >
+      {status}
+    </span>
+  );
+}
+
+function IdChip({ kind, id, onClick }: { kind: string; id: string; onClick?: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={!onClick}
+      title={`${kind} ${id}`}
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        padding: "2px 7px",
+        borderRadius: 6,
+        background: "#f0f1f4",
+        color: onClick ? "var(--admin-blue)" : "var(--admin-ink-2)",
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+        flexShrink: 0,
+        cursor: onClick ? "pointer" : "default",
+      }}
+    >
+      {kind} {shortTraceId(id)}
+    </button>
+  );
+}
+
+/** API 호출 1줄 — 시간 · 메서드 경로 · 상태 · 소요시간 · (행동/요청 ID) */
+function AccessRow({
+  ev,
+  onAction,
+  onRequest,
+}: {
+  ev: TraceEvent;
+  onAction?: (id: string) => void;
+  onRequest?: (id: string) => void;
+}) {
+  const a = ev.access!;
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "7px 0",
+        borderTop: "1px solid var(--admin-border)",
+        fontSize: 12.5,
+        flexWrap: "wrap",
+      }}
+    >
+      <span style={{ color: "var(--admin-ink-3)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+        {formatMillis(ev.timestamp, true)}
+      </span>
+      <StatusBadge status={a.status} />
+      <span style={{ fontWeight: 700, flexShrink: 0 }}>{a.method}</span>
+      <span style={{ wordBreak: "break-all", flex: 1, minWidth: 160 }}>{a.path}</span>
+      <span style={{ color: "var(--admin-ink-3)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{a.durationMs}ms</span>
+      {onAction && ev.actionId && <IdChip kind="행동" id={ev.actionId} onClick={() => onAction(ev.actionId!)} />}
+      {ev.requestId && <IdChip kind="요청" id={ev.requestId} onClick={onRequest ? () => onRequest(ev.requestId!) : undefined} />}
+    </div>
+  );
+}
+
+function LogLines({ events }: { events: TraceEvent[] }) {
+  return (
+    <div
+      style={{
+        background: "#16161a",
+        borderRadius: 8,
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+        fontSize: 12,
+        lineHeight: 1.55,
+        padding: "8px 12px",
+        overflow: "auto",
+      }}
+    >
+      {events.map((ev, i) => (
+        <div key={`${ev.timestamp}-${i}`} style={{ display: "flex", gap: 10, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+          <span style={{ color: "#6b6b76", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{formatMillis(ev.timestamp, true)}</span>
+          <span style={{ color: levelColor(ev.message) }}>{ev.message}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 유저 검색 결과 — actionId 로 묶고 최근 행동이 위로 */
+function UserTraceView({
+  events,
+  onAction,
+  onRequest,
+}: {
+  events: TraceEvent[];
+  onAction: (id: string) => void;
+  onRequest: (id: string) => void;
+}) {
+  const groups = useMemo(() => {
+    const map = new Map<string, TraceEvent[]>();
+    events.forEach((ev, i) => {
+      const key = ev.actionId ? `a:${ev.actionId}` : `r:${ev.requestId ?? i}`;
+      map.set(key, [...(map.get(key) ?? []), ev]);
+    });
+    return Array.from(map.entries())
+      .map(([key, evs]) => ({ key, actionId: evs[0].actionId, events: [...evs].sort((a, b) => b.timestamp - a.timestamp) }))
+      .sort((a, b) => b.events[0].timestamp - a.events[0].timestamp);
+  }, [events]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {groups.map((g) =>
+        g.actionId ? (
+          <div key={g.key} style={{ border: "1px solid var(--admin-border)", borderRadius: 10, padding: "8px 12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700 }}>행동</span>
+              <IdChip kind="" id={g.actionId} onClick={() => onAction(g.actionId!)} />
+              <span style={{ fontSize: 12, color: "var(--admin-ink-3)" }}>API {g.events.length}회</span>
+              {g.events.some((e) => (e.access?.status ?? 0) >= 400) && (
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--admin-red-ink)", background: "var(--admin-red-tint)", padding: "2px 7px", borderRadius: 999 }}>
+                  실패 포함
+                </span>
+              )}
+            </div>
+            {g.events.map((ev, i) => (
+              <AccessRow key={`${ev.timestamp}-${i}`} ev={ev} onRequest={onRequest} />
+            ))}
+          </div>
+        ) : (
+          <div key={g.key} style={{ padding: "0 12px" }}>
+            {g.events.map((ev, i) => (
+              <AccessRow key={`${ev.timestamp}-${i}`} ev={ev} onAction={onAction} onRequest={onRequest} />
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+/** 행동 검색 결과 — 요청(requestId) 단위로 시간순, 각 요청의 에러 등 로그 줄을 아래에 */
+function ActionTraceView({ events, onRequest }: { events: TraceEvent[]; onRequest: (id: string) => void }) {
+  const requests = useMemo(() => {
+    const map = new Map<string, TraceEvent[]>();
+    events.forEach((ev, i) => {
+      const key = ev.requestId ?? `none-${i}`;
+      map.set(key, [...(map.get(key) ?? []), ev]);
+    });
+    return Array.from(map.entries()).sort((a, b) => a[1][0].timestamp - b[1][0].timestamp);
+  }, [events]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {requests.map(([key, evs]) => {
+        const access = evs.find((e) => e.access);
+        const others = evs.filter((e) => !e.access);
+        return (
+          <div key={key} style={{ border: "1px solid var(--admin-border)", borderRadius: 10, padding: "4px 12px 10px" }}>
+            {access ? (
+              <AccessRow ev={access} onRequest={onRequest} />
+            ) : (
+              <div style={{ padding: "7px 0", fontSize: 12, color: "var(--admin-ink-3)" }}>요청 기록 없음 (진행 중이거나 기간 밖)</div>
+            )}
+            {others.length > 0 && <LogLines events={others} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TracePanel() {
+  const isMobile = useIsMobile();
+  const [env, setEnv] = useState<MonitoringEnv>("PROD");
+  const [range, setRange] = useState<MonitoringRange>("H24");
+  const [type, setType] = useState<TraceType>("USER");
+  const [input, setInput] = useState("");
+  // 파고든 경로: 유저 → 행동 → 요청. 마지막이 현재 검색
+  const [stack, setStack] = useState<{ type: TraceType; value: string; label: string }[]>([]);
+  const [result, setResult] = useState<TraceEvents | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [candidates, setCandidates] = useState<AdminUserSearchResult[] | null>(null);
+
+  const current = stack[stack.length - 1];
+
+  const load = useCallback(
+    async (nextToken?: string) => {
+      if (!current) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await getTraceEvents({ env, type: current.type, value: current.value, range, nextToken });
+        setResult((prev) => (nextToken && prev ? { ...res, events: [...prev.events, ...res.events] } : res));
+      } catch (e) {
+        setError(errorText(e));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [env, range, current]
+  );
+
+  useEffect(() => {
+    setResult(null);
+    load();
+  }, [load]);
+
+  const startSearch = async () => {
+    const v = input.trim();
+    if (!v) return;
+    setCandidates(null);
+    // 유저는 닉네임으로도 찾게 — 숫자가 아니면 관리자 유저 검색으로 후보를 띄운다
+    if (type === "USER" && !/^\d+$/.test(v)) {
+      try {
+        setCandidates(await searchAdminUsers(v, 10));
+      } catch (e) {
+        setError(errorText(e));
+      }
+      return;
+    }
+    setStack([{ type, value: v, label: `${TRACE_TYPE_LABEL[type]} ${type === "USER" ? v : shortTraceId(v)}` }]);
+  };
+
+  const drill = (t: TraceType, v: string) =>
+    setStack((prev) => [...prev, { type: t, value: v, label: `${TRACE_TYPE_LABEL[t]} ${shortTraceId(v)}` }]);
+
+  const nickname = current?.type === "USER" ? result?.events.find((e) => e.nickname)?.nickname : null;
+
+  return (
+    <>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+        <Chips options={ENVS} value={env} label={(v) => ENV_LABEL[v]} onChange={setEnv} />
+        <Chips options={RANGES} value={range} label={(v) => RANGE_LABEL[v]} onChange={setRange} />
+        <div style={{ flex: 1 }} />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            startSearch();
+          }}
+          style={{ display: "flex", gap: 6, width: isMobile ? "100%" : "auto", flexWrap: "wrap" }}
+        >
+          <Chips options={TRACE_TYPES} value={type} label={(v) => TRACE_TYPE_LABEL[v]} onChange={setType} />
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={type === "USER" ? "유저 ID 또는 닉네임" : type === "ACTION" ? "행동 ID (X-Action-Id)" : "요청 ID (X-Request-Id)"}
+            style={{
+              height: 38,
+              flex: 1,
+              width: isMobile ? "auto" : 240,
+              padding: "0 12px",
+              borderRadius: 10,
+              border: "1px solid var(--admin-border)",
+              fontSize: 13,
+              background: "#fff",
+            }}
+          />
+          <button type="submit" style={btnSecondary}>
+            검색
+          </button>
+        </form>
+      </div>
+
+      {candidates && (
+        <div style={{ ...adminCardStyle, padding: 12, marginBottom: 12 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>
+            {candidates.length === 0 ? "일치하는 유저가 없습니다" : "유저를 선택하세요"}
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {candidates.map((u) => (
+              <button
+                key={u.userId}
+                onClick={() => {
+                  setCandidates(null);
+                  setStack([{ type: "USER", value: String(u.userId), label: `유저 ${u.userNickname ?? u.userId}` }]);
+                }}
+                style={{ ...btnSecondary, height: 32, fontSize: 12.5 }}
+              >
+                {u.userNickname ?? "(닉네임 없음)"} · #{u.userId}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ ...adminCardStyle, padding: 14, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+          {stack.length === 0 ? (
+            <span style={{ fontSize: 13.5, fontWeight: 700 }}>유저 추적</span>
+          ) : (
+            stack.map((s, i) => {
+              const last = i === stack.length - 1;
+              return (
+                <React.Fragment key={`${s.type}-${s.value}`}>
+                  {i > 0 && <span style={{ color: "var(--admin-ink-3)" }}>›</span>}
+                  <button
+                    onClick={() => !last && setStack((prev) => prev.slice(0, i + 1))}
+                    disabled={last}
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: last ? "var(--admin-ink)" : "var(--admin-blue)",
+                      cursor: last ? "default" : "pointer",
+                    }}
+                  >
+                    {s.label}
+                    {last && nickname && s.type === "USER" && !s.label.includes(nickname) ? ` (${nickname})` : ""}
+                  </button>
+                </React.Fragment>
+              );
+            })
+          )}
+          <div style={{ flex: 1 }} />
+          <button style={{ ...btnSecondary, height: 30, fontSize: 12 }} onClick={() => load()} disabled={!current || loading}>
+            새로고침
+          </button>
+        </div>
+
+        {!current ? (
+          <EmptyBox height={240}>
+            유저 ID·닉네임, 행동 ID, 요청 ID 로 서버 로그를 찾습니다
+            <br />
+            유저 → 행동(오디션 지원·결제) → 요청 순서로 눌러서 파고들 수 있어요
+          </EmptyBox>
+        ) : error !== null ? (
+          <EmptyBox height={240}>{error}</EmptyBox>
+        ) : !result ? (
+          <EmptyBox height={240}>불러오는 중…</EmptyBox>
+        ) : !result.supported ? (
+          <EmptyBox height={240}>Dev 서버 로그는 아직 수집하지 않습니다</EmptyBox>
+        ) : result.events.length === 0 ? (
+          <EmptyBox height={240}>
+            {RANGE_LABEL[range]} 동안 기록이 없습니다
+            {result.nextToken ? " (더 찾아보기를 눌러 계속 검색)" : ""}
+          </EmptyBox>
+        ) : current.type === "USER" ? (
+          <UserTraceView
+            events={result.events}
+            onAction={(id) => drill("ACTION", id)}
+            onRequest={(id) => drill("REQUEST", id)}
+          />
+        ) : current.type === "ACTION" ? (
+          <ActionTraceView events={result.events} onRequest={(id) => drill("REQUEST", id)} />
+        ) : (
+          <LogLines events={result.events} />
+        )}
+
+        {current && result?.nextToken && (
+          <button
+            onClick={() => load(result.nextToken ?? undefined)}
+            disabled={loading}
+            style={{ ...btnSecondary, width: "100%", marginTop: 10, height: 34, fontSize: 12.5 }}
+          >
+            {loading ? "불러오는 중…" : result.events.length === 0 ? "더 찾아보기" : "다음 결과 더 보기"}
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
 function LogsTab() {
   const [section, setSection] = useState<LogSection>("appErrors");
   return (
@@ -939,7 +1334,7 @@ function LogsTab() {
       <div style={{ marginBottom: 14 }}>
         <Chips options={LOG_SECTIONS} value={section} label={(v) => LOG_SECTION_LABEL[v]} onChange={setSection} />
       </div>
-      {section === "appErrors" ? <AppErrorsPanel /> : <ServerLogsPanel />}
+      {section === "appErrors" ? <AppErrorsPanel /> : section === "server" ? <ServerLogsPanel /> : <TracePanel />}
     </>
   );
 }

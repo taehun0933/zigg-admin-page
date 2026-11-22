@@ -184,3 +184,50 @@ export async function getLogEvents(params: {
   const res = await apiClient.get<LogEvents>("/monitoring/logs", { params });
   return res.data;
 }
+
+/* ───────────── 유저 추적 (userId → actionId → requestId) ───────────── */
+
+// USER = 유저의 API 호출 목록, ACTION = 한 행동(오디션 지원·결제 등)의 모든 로그, REQUEST = API 호출 1번의 모든 로그
+export type TraceType = "USER" | "ACTION" | "REQUEST";
+
+export const TRACE_TYPE_LABEL: Record<TraceType, string> = {
+  USER: "유저",
+  ACTION: "행동 ID",
+  REQUEST: "요청 ID",
+};
+
+export interface TraceAccess {
+  method: string;
+  path: string;
+  status: number;
+  durationMs: number;
+}
+
+export interface TraceEvent {
+  timestamp: number; // epoch millis
+  instanceId: string;
+  level: string | null;
+  requestId: string | null;
+  actionId: string | null;
+  userId: number | null;
+  nickname: string | null;
+  access: TraceAccess | null; // access log 줄일 때만
+  message: string;
+}
+
+export interface TraceEvents {
+  supported: boolean; // false = 수집 미연동(dev)
+  events: TraceEvent[]; // 시간 오름차순
+  nextToken: string | null;
+}
+
+export async function getTraceEvents(params: {
+  env: MonitoringEnv;
+  type: TraceType;
+  value: string;
+  range: MonitoringRange;
+  nextToken?: string;
+}): Promise<TraceEvents> {
+  const res = await apiClient.get<TraceEvents>("/monitoring/logs/trace", { params });
+  return res.data;
+}

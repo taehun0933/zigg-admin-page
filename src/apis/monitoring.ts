@@ -185,6 +185,77 @@ export async function getLogEvents(params: {
   return res.data;
 }
 
+/* ───────────── 통합 로그 (prod CloudWatch + dev Loki 한 타임라인) ───────────── */
+
+export type LogLevel = "ERROR" | "WARN" | "INFO" | "DEBUG" | "TRACE";
+
+export interface LogSource {
+  env: MonitoringEnv;
+  instanceId: string; // prod = EC2 인스턴스 ID, dev = oracle-dev
+  firstEventAt: number | null; // epoch millis
+  lastEventAt: number | null;
+  containers: string[];
+}
+
+export interface LogSourceError {
+  env: MonitoringEnv;
+  instanceId: string | null;
+  message: string;
+}
+
+export interface LogSources {
+  sources: LogSource[];
+  errors: LogSourceError[];
+}
+
+export interface UnifiedLogEvent {
+  id: string; // 중복 제거 키
+  timestamp: number; // epoch millis
+  env: MonitoringEnv;
+  instanceId: string;
+  container: string;
+  level: LogLevel | null;
+  requestId: string | null;
+  actionId: string | null;
+  userId: number | null;
+  message: string;
+}
+
+export interface UnifiedLogEvents {
+  events: UnifiedLogEvent[]; // 시간 오름차순
+  cursor: number | null; // 더 이전 로그 볼 때 before 로
+  errors: LogSourceError[];
+}
+
+export const sourceKey = (s: { env: MonitoringEnv; instanceId: string }) => `${s.env}:${s.instanceId}`;
+
+export async function getLogSources(range: MonitoringRange): Promise<LogSources> {
+  const res = await apiClient.get<LogSources>("/monitoring/logs/sources", { params: { range } });
+  return res.data;
+}
+
+// 배열은 콤마로 (axios 기본 sources[]= 형식은 Spring 이 못 받는다)
+export async function getUnifiedLogs(params: {
+  sources: string[];
+  containers?: string[];
+  levels?: LogLevel[];
+  query?: string;
+  range: MonitoringRange;
+  before?: number;
+  after?: number;
+}): Promise<UnifiedLogEvents> {
+  const { sources, containers, levels, ...rest } = params;
+  const res = await apiClient.get<UnifiedLogEvents>("/monitoring/logs/unified", {
+    params: {
+      ...rest,
+      sources: sources.join(","),
+      containers: containers?.join(","),
+      levels: levels?.join(","),
+    },
+  });
+  return res.data;
+}
+
 /* ───────────── 유저 추적 (userId → actionId → requestId) ───────────── */
 
 // USER = 유저의 API 호출 목록, ACTION = 한 행동(오디션 지원·결제 등)의 모든 로그, REQUEST = API 호출 1번의 모든 로그

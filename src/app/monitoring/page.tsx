@@ -24,12 +24,14 @@ import {
   getClientErrors,
   getClientErrorSummary,
   getClientErrorStepSummary,
-  getLogEvents,
-  getLogInstances,
+  getLogSources,
+  getUnifiedLogs,
   getResourceMonitoring,
   getTraceEvents,
-  LogEvents,
-  LogInstances,
+  LogLevel,
+  LogSource,
+  LogSourceError,
+  LogSources,
   MetricPanel,
   MonitoringEnv,
   MonitoringRange,
@@ -41,6 +43,8 @@ import {
   TraceEvent,
   TraceEvents,
   TraceType,
+  sourceKey,
+  UnifiedLogEvent,
 } from "@/apis/monitoring";
 import { AdminUserSearchResult, searchAdminUsers } from "@/apis/user";
 import { handleApiError } from "@/utils/apiError";
@@ -662,11 +666,6 @@ function AppErrorsPanel() {
   );
 }
 
-// 서버 로그 — VM(EC2 인스턴스) 별 CloudWatch 로그. dev 는 아직 수집 안 함.
-
-// 컨테이너 로그의 ANSI 색 코드·compose 접두어(backend-1 | ) 제거
-const cleanLogLine = (msg: string) =>
-  msg.replace(/\x1b\[[0-9;]*m/g, "").replace(/^[\w.-]+-\d+\s+\|\s?/, "");
 
 const levelColor = (line: string) =>
   /\bERROR\b|Exception/.test(line) ? "#ff6b63" : /\bWARN\b/.test(line) ? "#ffb340" : "#d4d4d8";
@@ -678,98 +677,305 @@ const formatMillis = (ms: number | null, withSec = false) => {
   return withSec ? `${base}:${pad(d.getSeconds())}` : base;
 };
 
+// 서버 로그 (통합) — prod EC2(CloudWatch) + dev Oracle(Loki) 의 모든 컨테이너 로그를 한 타임라인으로.
+// 왼쪽 리소스 트리에서 VM·컨테이너를 고르면 오른쪽에 시간순으로 합쳐 보인다 (ArgoCD 로그 뷰 방식).
+
+const LOG_LEVELS: LogLevel[] = ["ERROR", "WARN", "INFO", "DEBUG"];
+const LIVE_INTERVAL_MS = 3000;
+// CloudWatch 는 수집이 몇 초 늦다 → 실시간 조회는 마지막 줄보다 조금 앞부터 다시 받고 id 로 중복 제거
+const LIVE_OVERLAP_MS = 15000;
+const MAX_EVENTS = 3000;
+
+const ENV_COLOR: Record<MonitoringEnv, { fg: string; bg: string }> = {
+  PROD: { fg: "#5ea8ff", bg: "rgba(0,122,255,.18)" },
+  DEV: { fg: "#4cd68a", bg: "rgba(45,189,111,.18)" },
+};
+// 컨테이너별 색 (어두운 콘솔 배경용)
+const CONTAINER_COLORS = ["#c084fc", "#f472b6", "#fbbf24", "#22d3ee", "#a3e635", "#fb923c", "#93c5fd"];
+const containerColor = (name: string) => {
+  let h = 0;
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return CONTAINER_COLORS[h % CONTAINER_COLORS.length];
+};
+const LEVEL_COLOR: Record<LogLevel, string> = {
+  ERROR: "#ff6b63",
+  WARN: "#ffb340",
+  INFO: "#d4d4d8",
+  DEBUG: "#8e8e96",
+  TRACE: "#6b6b76",
+};
+const LEVEL_CHIP: Record<LogLevel, { on: string; tint: string }> = {
+  ERROR: { on: "var(--admin-red-ink)", tint: "var(--admin-red-tint)" },
+  WARN: { on: "var(--admin-warn)", tint: "var(--admin-warn-tint)" },
+  INFO: { on: "var(--admin-blue)", tint: "var(--admin-blue-tint)" },
+  DEBUG: { on: "var(--admin-ink-2)", tint: "#f0f1f4" },
+  TRACE: { on: "var(--admin-ink-2)", tint: "#f0f1f4" },
+};
+
+const formatLogTime = (ms: number) => {
+  const d = new Date(ms);
+  return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(
+    d.getMilliseconds()
+  ).padStart(3, "0")}`;
+};
+
+const mergeEvents = (a: UnifiedLogEvent[], b: UnifiedLogEvent[]) => {
+  const seen = new Set<string>();
+  const out: UnifiedLogEvent[] = [];
+  for (const e of [...a, ...b]) {
+    if (seen.has(e.id)) continue;
+    seen.add(e.id);
+    out.push(e);
+  }
+  return out.sort((x, y) => x.timestamp - y.timestamp);
+};
+
+const isLive = (s: LogSource) => s.env === "DEV" || (s.lastEventAt != null && Date.now() - s.lastEventAt < 15 * 60 * 1000);
+
+function CheckRow({
+  checked,
+  onChange,
+  children,
+  dot,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  children: React.ReactNode;
+  dot?: string;
+}) {
+  return (
+    <label
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "6px 8px",
+        borderRadius: 8,
+        cursor: "pointer",
+        background: checked ? "var(--admin-blue-tint)" : "transparent",
+        fontSize: 12.5,
+      }}
+    >
+      <input type="checkbox" checked={checked} onChange={onChange} style={{ accentColor: "var(--admin-blue)" }} />
+      {dot && <span style={{ width: 8, height: 8, borderRadius: 999, background: dot, flexShrink: 0 }} />}
+      <span style={{ minWidth: 0, flex: 1, display: "flex", alignItems: "center", gap: 6 }}>{children}</span>
+    </label>
+  );
+}
+
 function ServerLogsPanel() {
   const isMobile = useIsMobile();
-  const [env, setEnv] = useState<MonitoringEnv>("PROD");
   const [range, setRange] = useState<MonitoringRange>("H24");
-  const [instances, setInstances] = useState<LogInstances | null>(null);
-  const [instanceError, setInstanceError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [sources, setSources] = useState<LogSources | null>(null);
+  const [sourcesError, setSourcesError] = useState<string | null>(null);
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+  // 끈 컨테이너만 기억 → 새 컨테이너가 생기면 기본으로 보인다
+  const [hiddenContainers, setHiddenContainers] = useState<Set<string>>(new Set());
+  const [levels, setLevels] = useState<Set<LogLevel>>(new Set());
   const [queryInput, setQueryInput] = useState("");
   const [query, setQuery] = useState("");
-  const [logs, setLogs] = useState<LogEvents | null>(null);
-  const [logError, setLogError] = useState<string | null>(null);
-  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [live, setLive] = useState(false);
 
-  // VM 목록 — env/기간이 바뀌면 다시, 가장 최근 VM 자동 선택
-  useEffect(() => {
+  const [events, setEvents] = useState<UnifiedLogEvent[] | null>(null);
+  const [cursor, setCursor] = useState<number | null>(null);
+  const [logErrors, setLogErrors] = useState<LogSourceError[]>([]);
+  const [logError, setLogError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const consoleRef = React.useRef<HTMLDivElement>(null);
+  const stickToBottom = React.useRef(true);
+  const eventsRef = React.useRef<UnifiedLogEvent[] | null>(null);
+  eventsRef.current = events;
+
+  // 리소스 트리 — 기간이 바뀌면 다시. 처음엔 가동 중인 VM 전부 선택
+  const loadSources = useCallback(() => {
     let cancelled = false;
-    setInstances(null);
-    setInstanceError(null);
-    setLogs(null);
-    getLogInstances(env, range)
+    setSourcesError(null);
+    getLogSources(range)
       .then((res) => {
         if (cancelled) return;
-        setInstances(res);
-        setSelected((cur) =>
-          cur && res.instances.some((i) => i.instanceId === cur) ? cur : res.instances[0]?.instanceId ?? null
-        );
+        setSources(res);
+        setSelectedSources((cur) => {
+          const keys = new Set(res.sources.map(sourceKey));
+          const kept = new Set([...cur].filter((k) => keys.has(k)));
+          if (kept.size > 0) return kept;
+          const live = res.sources.filter(isLive);
+          return new Set((live.length > 0 ? live : res.sources.slice(0, 1)).map(sourceKey));
+        });
       })
-      .catch((e) => !cancelled && setInstanceError(errorText(e)));
+      .catch((e) => !cancelled && setSourcesError(errorText(e)));
     return () => {
       cancelled = true;
     };
-  }, [env, range]);
+  }, [range]);
 
-  const loadLogs = useCallback(
-    async (nextToken?: string) => {
-      if (!selected) return;
-      setLoadingLogs(true);
-      setLogError(null);
-      try {
-        const res = await getLogEvents({
-          env,
-          instanceId: selected,
-          range,
-          query: query || undefined,
-          nextToken,
-        });
-        setLogs((prev) =>
-          !nextToken || !prev
-            ? res
-            : {
-                ...res,
-                // 검색 없음: 더 이전 로그를 위에, 검색 중: 다음 결과를 아래에
-                events: res.searching ? [...prev.events, ...res.events] : [...res.events, ...prev.events],
-              }
-        );
-      } catch (e) {
-        setLogError(errorText(e));
-      } finally {
-        setLoadingLogs(false);
-      }
-    },
-    [env, selected, range, query]
+  useEffect(() => loadSources(), [loadSources]);
+
+  const allContainers = useMemo(() => {
+    const set = new Set<string>();
+    sources?.sources.filter((s) => selectedSources.has(sourceKey(s))).forEach((s) => s.containers.forEach((c) => set.add(c)));
+    return [...set].sort((a, b) => (a === "backend" ? -1 : b === "backend" ? 1 : a.localeCompare(b)));
+  }, [sources, selectedSources]);
+
+  const visibleContainers = useMemo(() => allContainers.filter((c) => !hiddenContainers.has(c)), [allContainers, hiddenContainers]);
+
+  const request = useMemo(
+    () => ({
+      sources: [...selectedSources].sort(),
+      // 전부 켜져 있으면 필터 생략
+      containers: visibleContainers.length === allContainers.length ? undefined : visibleContainers,
+      levels: levels.size > 0 ? [...levels] : undefined,
+      query: query || undefined,
+      range,
+    }),
+    [selectedSources, visibleContainers, allContainers, levels, query, range]
   );
+  const requestKey = JSON.stringify(request);
+  const nothingSelected = request.sources.length === 0 || (allContainers.length > 0 && visibleContainers.length === 0);
+
+  // 처음 / 조건 변경 → 최신 로그부터
+  const loadLatest = useCallback(async () => {
+    if (nothingSelected) {
+      setEvents([]);
+      setCursor(null);
+      return;
+    }
+    setLoading(true);
+    setLogError(null);
+    try {
+      const res = await getUnifiedLogs(request);
+      stickToBottom.current = true;
+      setEvents(res.events);
+      setCursor(res.cursor);
+      setLogErrors(res.errors);
+    } catch (e) {
+      setLogError(errorText(e));
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestKey, nothingSelected]);
 
   useEffect(() => {
-    setLogs(null);
-    loadLogs();
-  }, [loadLogs]);
+    if (!sources) return;
+    setEvents(null);
+    loadLatest();
+  }, [loadLatest, sources]);
 
-  const moreButton = logs?.nextToken ? (
-    <button
-      onClick={() => loadLogs(logs.nextToken ?? undefined)}
-      disabled={loadingLogs}
-      style={{
-        width: "100%",
-        padding: "8px 0",
-        fontSize: 12,
-        color: "#a1a1aa",
-        background: "#1f1f24",
-        borderRadius: 6,
-        margin: "4px 0",
-      }}
-    >
-      {loadingLogs ? "불러오는 중…" : logs.searching ? "다음 검색 결과 더 보기" : "이전 로그 더 보기"}
-    </button>
-  ) : null;
+  const loadOlder = async () => {
+    if (cursor == null) return;
+    const el = consoleRef.current;
+    const prevHeight = el?.scrollHeight ?? 0;
+    setLoading(true);
+    try {
+      const res = await getUnifiedLogs({ ...request, before: cursor });
+      stickToBottom.current = false;
+      setEvents((prev) => mergeEvents(res.events, prev ?? []));
+      setCursor(res.cursor);
+      setLogErrors(res.errors);
+      // 위에 붙여도 보던 줄이 그대로 보이게
+      requestAnimationFrame(() => {
+        if (el) el.scrollTop += el.scrollHeight - prevHeight;
+      });
+    } catch (e) {
+      setLogError(errorText(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 실시간 — 3초마다 마지막 줄 이후를 받아 아래에 붙인다
+  useEffect(() => {
+    if (!live || nothingSelected) return;
+    let stopped = false;
+    let busy = false;
+    const tick = async () => {
+      if (busy || stopped) return;
+      busy = true;
+      try {
+        const cur = eventsRef.current ?? [];
+        const last = cur.length > 0 ? cur[cur.length - 1].timestamp : Date.now() - 60_000;
+        const res = await getUnifiedLogs({ ...request, after: last - LIVE_OVERLAP_MS });
+        if (stopped) return;
+        if (res.events.length > 0) {
+          setEvents((prev) => {
+            const merged = mergeEvents(prev ?? [], res.events);
+            if (merged.length <= MAX_EVENTS) return merged;
+            const trimmed = merged.slice(merged.length - MAX_EVENTS);
+            setCursor(trimmed[0].timestamp); // 잘라낸 앞부분은 "이전 로그 더 보기"로 다시
+            return trimmed;
+          });
+        }
+        setLogErrors(res.errors);
+      } catch {
+        // 일시 오류는 다음 틱에 다시
+      } finally {
+        busy = false;
+      }
+    };
+    const id = setInterval(tick, LIVE_INTERVAL_MS);
+    tick();
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live, requestKey, nothingSelected]);
+
+  // 맨 아래를 보고 있으면 새 줄이 와도 따라 내려간다
+  useEffect(() => {
+    const el = consoleRef.current;
+    if (el && stickToBottom.current) el.scrollTop = el.scrollHeight;
+  }, [events]);
+
+  const toggle = <T,>(set: Set<T>, v: T) => {
+    const next = new Set(set);
+    if (next.has(v)) next.delete(v);
+    else next.add(v);
+    return next;
+  };
+
+  const counts = useMemo(() => {
+    const c: Partial<Record<LogLevel, number>> = {};
+    events?.forEach((e) => e.level && (c[e.level] = (c[e.level] ?? 0) + 1));
+    return c;
+  }, [events]);
+
+  const groups: { env: MonitoringEnv; title: string; list: LogSource[] }[] = sources
+    ? [
+        { env: "PROD", title: "PROD · AWS EC2", list: sources.sources.filter((s) => s.env === "PROD") },
+        { env: "DEV", title: "DEV · Oracle", list: sources.sources.filter((s) => s.env === "DEV") },
+      ]
+    : [];
 
   return (
     <>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
-        <Chips options={ENVS} value={env} label={(v) => ENV_LABEL[v]} onChange={setEnv} />
         <Chips options={RANGES} value={range} label={(v) => RANGE_LABEL[v]} onChange={setRange} />
+        <div style={{ display: "inline-flex", gap: 4 }}>
+          {LOG_LEVELS.map((lv) => {
+            const on = levels.has(lv);
+            return (
+              <button
+                key={lv}
+                onClick={() => setLevels((s) => toggle(s, lv))}
+                style={{
+                  height: 30,
+                  padding: "0 10px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  border: `1px solid ${on ? LEVEL_CHIP[lv].on : "var(--admin-border)"}`,
+                  background: on ? LEVEL_CHIP[lv].tint : "#fff",
+                  color: on ? LEVEL_CHIP[lv].on : "var(--admin-ink-2)",
+                }}
+              >
+                {lv}
+                {counts[lv] ? <span style={{ marginLeft: 5, fontWeight: 600, opacity: 0.75 }}>{counts[lv]}</span> : null}
+              </button>
+            );
+          })}
+        </div>
         <div style={{ flex: 1 }} />
         <form
           onSubmit={(e) => {
@@ -781,11 +987,11 @@ function ServerLogsPanel() {
           <input
             value={queryInput}
             onChange={(e) => setQueryInput(e.target.value)}
-            placeholder="로그 검색 (예: ERROR, userId=123)"
+            placeholder="로그 검색 (대소문자 무시, 예: Exception, uid=12])"
             style={{
               height: 38,
               flex: 1,
-              width: isMobile ? "auto" : 240,
+              width: isMobile ? "auto" : 260,
               padding: "0 12px",
               borderRadius: 10,
               border: "1px solid var(--admin-border)",
@@ -811,125 +1017,220 @@ function ServerLogsPanel() {
         </form>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "260px minmax(0, 1fr)",
-          gap: 14,
-        }}
-      >
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "270px minmax(0, 1fr)", gap: 14 }}>
+        {/* ── 리소스 트리 ── */}
         <div style={{ ...adminCardStyle, padding: 14, alignSelf: "start" }}>
-          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 4 }}>VM 목록</div>
-          <div style={{ fontSize: 12, color: "var(--admin-ink-3)", marginBottom: 10 }}>
-            {RANGE_LABEL[range]} 동안 로그를 남긴 {env === "PROD" ? "EC2 인스턴스" : "서버"}
+          <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
+            <span style={{ fontSize: 13.5, fontWeight: 700 }}>리소스</span>
+            <button
+              onClick={loadSources}
+              style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--admin-ink-3)" }}
+              title="VM 목록 새로고침"
+            >
+              ↻
+            </button>
           </div>
-          {instanceError !== null ? (
-            <EmptyBox height={160}>{instanceError}</EmptyBox>
-          ) : !instances ? (
+          {sourcesError !== null ? (
+            <EmptyBox height={160}>{sourcesError}</EmptyBox>
+          ) : !sources ? (
             <EmptyBox height={160}>불러오는 중…</EmptyBox>
-          ) : !instances.supported ? (
-            <EmptyBox height={160}>
-              Dev 서버 로그는 아직 수집하지 않습니다
-              <br />
-              (CloudWatch 연동 예정)
-            </EmptyBox>
-          ) : instances.instances.length === 0 ? (
-            <EmptyBox height={160}>기간 내 로그가 없습니다</EmptyBox>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {instances.instances.map((inst, idx) => {
-                const on = inst.instanceId === selected;
-                const live = idx === 0 && inst.lastEventAt != null && Date.now() - inst.lastEventAt < 15 * 60 * 1000;
+            <>
+              {groups.map((g) => {
+                const err = sources.errors.find((e) => e.env === g.env);
                 return (
-                  <button
-                    key={inst.instanceId}
-                    onClick={() => setSelected(inst.instanceId)}
-                    title={inst.instanceId}
-                    style={{
-                      textAlign: "left",
-                      padding: "9px 11px",
-                      borderRadius: 10,
-                      border: `1px solid ${on ? "var(--admin-blue)" : "var(--admin-border)"}`,
-                      background: on ? "var(--admin-blue-tint)" : "#fff",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 700, color: on ? "var(--admin-blue)" : "var(--admin-ink)" }}>
-                        {shortId(inst.instanceId)}
-                      </span>
-                      <span
-                        style={{
-                          marginLeft: "auto",
-                          fontSize: 10.5,
-                          fontWeight: 700,
-                          padding: "2px 7px",
-                          borderRadius: 999,
-                          background: live ? "var(--admin-good-tint)" : "#f0f1f4",
-                          color: live ? "var(--admin-good)" : "var(--admin-ink-3)",
-                        }}
-                      >
-                        {live ? "가동 중" : "종료"}
-                      </span>
+                  <div key={g.env} style={{ marginBottom: 12 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        color: "var(--admin-ink-2)",
+                        margin: "4px 0 4px 2px",
+                      }}
+                    >
+                      <span style={{ width: 8, height: 8, borderRadius: 2, background: g.env === "PROD" ? "var(--admin-blue)" : "var(--admin-good)" }} />
+                      {g.title}
                     </div>
-                    <div style={{ fontSize: 11.5, color: "var(--admin-ink-3)", marginTop: 3, fontVariantNumeric: "tabular-nums" }}>
-                      {formatMillis(inst.firstEventAt)} ~ {live ? "현재" : formatMillis(inst.lastEventAt)}
-                    </div>
-                  </button>
+                    {err ? (
+                      <div style={{ fontSize: 11.5, color: "var(--admin-red-ink)", padding: "4px 8px", wordBreak: "break-all" }}>
+                        {err.message}
+                      </div>
+                    ) : g.list.length === 0 ? (
+                      <div style={{ fontSize: 11.5, color: "var(--admin-ink-3)", padding: "4px 8px" }}>기간 내 로그 없음</div>
+                    ) : (
+                      g.list.map((s) => {
+                        const key = sourceKey(s);
+                        const on = selectedSources.has(key);
+                        const alive = isLive(s);
+                        return (
+                          <CheckRow key={key} checked={on} onChange={() => setSelectedSources((cur) => toggle(cur, key))}>
+                            <span title={s.instanceId} style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                              {shortId(s.instanceId)}
+                            </span>
+                            <span
+                              style={{
+                                marginLeft: "auto",
+                                fontSize: 10.5,
+                                fontWeight: 700,
+                                padding: "2px 7px",
+                                borderRadius: 999,
+                                background: alive ? "var(--admin-good-tint)" : "#f0f1f4",
+                                color: alive ? "var(--admin-good)" : "var(--admin-ink-3)",
+                              }}
+                            >
+                              {alive ? "가동 중" : `종료 ${formatMillis(s.lastEventAt)}`}
+                            </span>
+                          </CheckRow>
+                        );
+                      })
+                    )}
+                  </div>
                 );
               })}
-            </div>
+
+              <div style={{ borderTop: "1px solid var(--admin-border)", paddingTop: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--admin-ink-2)", marginLeft: 2 }}>컨테이너</span>
+                  {allContainers.length > 0 && (
+                    <button
+                      onClick={() => setHiddenContainers(visibleContainers.length === allContainers.length ? new Set(allContainers) : new Set())}
+                      style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--admin-blue)", fontWeight: 600 }}
+                    >
+                      {visibleContainers.length === allContainers.length ? "모두 끄기" : "모두 켜기"}
+                    </button>
+                  )}
+                </div>
+                {allContainers.length === 0 ? (
+                  <div style={{ fontSize: 11.5, color: "var(--admin-ink-3)", padding: "4px 8px" }}>VM 을 선택하세요</div>
+                ) : (
+                  allContainers.map((c) => (
+                    <CheckRow
+                      key={c}
+                      checked={!hiddenContainers.has(c)}
+                      onChange={() => setHiddenContainers((cur) => toggle(cur, c))}
+                      dot={containerColor(c)}
+                    >
+                      {c}
+                    </CheckRow>
+                  ))
+                )}
+              </div>
+            </>
           )}
         </div>
 
+        {/* ── 통합 로그 콘솔 ── */}
         <div style={{ ...adminCardStyle, padding: 14, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <span style={{ fontSize: 13.5, fontWeight: 700 }}>로그</span>
-            {selected && <span style={{ fontSize: 12, color: "var(--admin-ink-3)" }}>{selected}</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13.5, fontWeight: 700 }}>통합 로그</span>
+            <span style={{ fontSize: 12, color: "var(--admin-ink-3)" }}>
+              VM {request.sources.length}개 · 컨테이너 {visibleContainers.length}개{events ? ` · ${events.length.toLocaleString()}줄` : ""}
+            </span>
             {query && (
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--admin-blue)", background: "var(--admin-blue-tint)", padding: "2px 8px", borderRadius: 999 }}>
                 검색: {query}
               </span>
             )}
             <div style={{ flex: 1 }} />
-            <button style={{ ...btnSecondary, height: 30, fontSize: 12 }} onClick={() => loadLogs()} disabled={!selected || loadingLogs}>
+            <button
+              onClick={() => setLive((v) => !v)}
+              disabled={nothingSelected}
+              style={{
+                ...btnSecondary,
+                height: 30,
+                fontSize: 12,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                borderColor: live ? "var(--admin-good)" : undefined,
+                color: live ? "var(--admin-good)" : undefined,
+                background: live ? "var(--admin-good-tint)" : undefined,
+              }}
+            >
+              <span style={{ width: 7, height: 7, borderRadius: 999, background: live ? "var(--admin-good)" : "var(--admin-ink-3)" }} />
+              {live ? "실시간 켜짐" : "실시간"}
+            </button>
+            <button style={{ ...btnSecondary, height: 30, fontSize: 12 }} onClick={() => loadLatest()} disabled={loading || nothingSelected}>
               새로고침
             </button>
           </div>
+
+          {logErrors.length > 0 && (
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--admin-red-ink)",
+                background: "var(--admin-red-tint)",
+                borderRadius: 8,
+                padding: "6px 10px",
+                marginBottom: 8,
+                wordBreak: "break-all",
+              }}
+            >
+              {logErrors.map((e) => `${ENV_LABEL[e.env]}${e.instanceId ? ` ${shortId(e.instanceId)}` : ""}: ${e.message}`).join(" / ")}
+            </div>
+          )}
+
           <div
+            ref={consoleRef}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+            }}
             style={{
               background: "#16161a",
               borderRadius: 10,
               fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
               fontSize: 12,
               lineHeight: 1.55,
-              maxHeight: 620,
+              height: isMobile ? 520 : 660,
               overflow: "auto",
-              padding: logs && logs.events.length > 0 ? "8px 12px" : 0,
+              padding: events && events.length > 0 ? "8px 12px" : 0,
             }}
           >
-            {!selected ? (
-              <EmptyBox height={360}>VM 을 선택하면 해당 기간의 로그가 표시됩니다</EmptyBox>
+            {nothingSelected ? (
+              <EmptyBox height={360}>왼쪽에서 VM 과 컨테이너를 선택하세요</EmptyBox>
             ) : logError !== null ? (
               <EmptyBox height={360}>{logError}</EmptyBox>
-            ) : !logs ? (
+            ) : !events ? (
               <EmptyBox height={360}>불러오는 중…</EmptyBox>
-            ) : logs.events.length === 0 ? (
-              <EmptyBox height={360}>{query ? "검색 결과가 없습니다" : "기간 내 로그가 없습니다"}</EmptyBox>
+            ) : events.length === 0 ? (
+              <EmptyBox height={360}>{query || levels.size > 0 ? "조건에 맞는 로그가 없습니다" : "기간 내 로그가 없습니다"}</EmptyBox>
             ) : (
               <>
-                {!logs.searching && moreButton}
-                {logs.events.map((ev, i) => {
-                  const line = cleanLogLine(ev.message);
+                {cursor != null && (
+                  <button
+                    onClick={loadOlder}
+                    disabled={loading}
+                    style={{ width: "100%", padding: "8px 0", fontSize: 12, color: "#a1a1aa", background: "#1f1f24", borderRadius: 6, margin: "4px 0" }}
+                  >
+                    {loading ? "불러오는 중…" : `이전 로그 더 보기 (${formatMillis(cursor, true)} 이전)`}
+                  </button>
+                )}
+                {events.map((ev) => {
+                  const env = ENV_COLOR[ev.env];
                   return (
-                    <div key={`${ev.timestamp}-${i}`} style={{ display: "flex", gap: 10, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                      <span style={{ color: "#6b6b76", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
-                        {formatMillis(ev.timestamp, true)}
+                    <div key={ev.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "1px 0" }}>
+                      <span style={{ color: "#6b6b76", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{formatLogTime(ev.timestamp)}</span>
+                      <span
+                        title={`${ev.env} ${ev.instanceId}`}
+                        style={{ flexShrink: 0, color: env.fg, background: env.bg, borderRadius: 4, padding: "0 5px", fontSize: 11 }}
+                      >
+                        {ev.env === "PROD" ? `P·${ev.instanceId.slice(-4)}` : "DEV"}
                       </span>
-                      <span style={{ color: levelColor(line) }}>{line}</span>
+                      <span style={{ flexShrink: 0, color: containerColor(ev.container), width: isMobile ? "auto" : 118, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={ev.container}>
+                        {ev.container}
+                      </span>
+                      <span style={{ color: ev.level ? LEVEL_COLOR[ev.level] : "#d4d4d8", whiteSpace: "pre-wrap", wordBreak: "break-all", minWidth: 0 }}>
+                        {ev.message}
+                      </span>
                     </div>
                   );
                 })}
-                {logs.searching && moreButton}
+                {live && <div style={{ color: "#4cd68a", fontSize: 11.5, padding: "4px 0" }}>● 실시간 수신 중… (3초 간격)</div>}
               </>
             )}
           </div>

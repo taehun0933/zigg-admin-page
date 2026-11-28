@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { getApiMode, setApiMode, type ApiMode } from "@/utils/apiConfig";
 
@@ -12,6 +12,7 @@ interface ServerToggleProps {
 
 const ServerToggle: React.FC<ServerToggleProps> = ({ compact = false }) => {
   const router = useRouter();
+  const pathname = usePathname() ?? "";
   const { setIsLoggedIn } = useAuth();
   const [mode, setMode] = useState<ApiMode>("prod");
   const [pending, setPending] = useState<ApiMode | null>(null);
@@ -39,7 +40,8 @@ const ServerToggle: React.FC<ServerToggleProps> = ({ compact = false }) => {
     localStorage.removeItem("token");
     setIsLoggedIn(false);
     setPending(null);
-    router.push("/signin");
+    // 로그인 화면에선 그 자리에 머물고, 관리 화면에선 관리자 로그인으로
+    if (pathname !== "/signin" && pathname !== "/admin-signin") router.push("/admin-signin");
   };
 
   return (

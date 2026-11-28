@@ -135,10 +135,11 @@ const AdminShell: React.FC<AdminShellProps> = ({ children }) => {
   };
 
   const handleLogout = () => {
+    const signinPath = getStoredRole() === "TRAINER" ? "/signin" : "/admin-signin";
     localStorage.removeItem("token");
     localStorage.removeItem("role");
     setIsLoggedIn(false);
-    router.push("/signin");
+    router.push(signinPath);
   };
 
   const current =

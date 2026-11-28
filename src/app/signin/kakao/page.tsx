@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { authService } from "@/apis/login";
 import { kakaoRedirectUri } from "@/utils/socialLogin";
 import { errorMessageOf, nextPathAfterOAuth } from "@/utils/oauthRouting";
+import AuthShell, { authStyles as s } from "@/components/auth/AuthShell";
 
 // 카카오 인가 코드 리다이렉트 수신 → 백엔드 로그인 → 결과별 화면 이동
 export default function KakaoCallbackPage() {
@@ -39,17 +40,8 @@ export default function KakaoCallbackPage() {
   }, [router, setIsLoggedIn]);
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--admin-bg)",
-        display: "grid",
-        placeItems: "center",
-        fontSize: 13,
-        color: "var(--admin-ink-2)",
-      }}
-    >
-      카카오 로그인 중…
-    </div>
+    <AuthShell badge="FOR TRAINERS" bare>
+      <div className={s.loading}>카카오 로그인 중…</div>
+    </AuthShell>
   );
 }

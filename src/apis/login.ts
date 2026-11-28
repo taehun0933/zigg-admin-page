@@ -53,7 +53,7 @@ export const authService = {
     }
   },
 
-  // 카카오·애플 로그인. ADMIN/TRAINER 면 바로 로그인 처리,
+  // 카카오·애플 로그인. TRAINER 만 바로 로그인 처리(ADMIN 은 토큰 버림),
   // 아직 강사가 아니면 토큰을 sessionStorage 에만 두고(관리자 화면 진입 차단) 전환 신청에 사용한다.
   oauthLogin: async (
     payload:
@@ -70,9 +70,12 @@ export const authService = {
         throw new Error("로그인 응답에 토큰이 없습니다.");
       }
       const result = response.data;
-      if (result.role === "ADMIN" || result.role === "TRAINER") {
+      if (result.role === "TRAINER") {
+        // 소셜 로그인은 강사 권한만 통과 (관리자는 이메일 로그인 전용)
         localStorage.setItem("token", tokenValue);
         localStorage.setItem("role", result.role);
+        sessionStorage.removeItem(TRAINER_APPLY_TOKEN_KEY);
+      } else if (result.role === "ADMIN") {
         sessionStorage.removeItem(TRAINER_APPLY_TOKEN_KEY);
       } else {
         sessionStorage.setItem(TRAINER_APPLY_TOKEN_KEY, tokenValue);
